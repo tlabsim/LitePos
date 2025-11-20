@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LitePOS — BDT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Core stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app" class="app-shell">
+    <!-- APP HEADER -->
+    <header class="app-header">
+        <div class="logo-block">
+            <div class="logo-mark">
+                <span>৳</span>
+            </div>
+            <div class="logo-text">
+                <div class="logo-title" id="header-shop-name">
+                    LitePOS
+                </div>
+                <div class="logo-sub" id="header-shop-address">
+                    Bangla POS · বাংলা বিক্রয় ব্যবস্থা
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="header-shop-meta">
+                <span id="header-shop-phone"></span>
+            </div>
+            <div class="pill session-pill" id="header-session-pill">
+                <span class="pill-dot"></span>
+                <span id="header-user-label">Not signed in</span>
+                <span class="pill-role" id="header-user-role"></span>
+            </div>
+            <button id="btn-logout" class="btn btn-ghost btn-lg" type="button">
+                ⎋ Logout
+            </button>
+        </div>
+    </header>
+
+    <!-- LOGIN / SETUP SCREEN -->
+    <section id="login-screen" class="center-screen">
+        <div class="card card-large">
+            <div class="card-header">
+                <h1 class="card-title">
+                    POS Sign-in
+                    <span class="subheader-bn">· লগইন</span>
+                </h1>                
+            </div>
+            <div class="card-body" id="login-panel">
+                <!-- SUPERADMIN SETUP (first run) -->
+                <div id="setup-panel" class="stack-gap hidden">
+                    <div class="banner banner-accent">
+                        <strong>Initial setup · প্রথমবার সেটআপ</strong><br>
+                        Create a <strong>Superadmin</strong> account to manage shop, users &amp; backup.
+                    </div>
+                    <div class="two-col">
+                        <div class="field">
+                            <label class="field-label">Superadmin Name</label>
+                            <input type="text" id="setup-name" class="field-input" placeholder="Your name" autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label class="field-label">Username</label>
+                            <input type="text" id="setup-username" class="field-input" placeholder="e.g. admin" autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="two-col">
+                        <div class="field">
+                            <label class="field-label">PIN (4–6 digits)</label>
+                            <input type="password" id="setup-pin" class="field-input" maxlength="6" placeholder="e.g. 1234" inputmode="numeric" autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label class="field-label">Confirm PIN</label>
+                            <input type="password" id="setup-pin-confirm" class="field-input" maxlength="6" placeholder="Repeat PIN" inputmode="numeric" autocomplete="off">
+                        </div>
+                    </div>
+                    <button id="btn-setup-create" class="btn btn-primary btn-xl" type="button">
+                        ✔ Create Superadmin
+                    </button>
+                </div>
+
+                <!-- NORMAL LOGIN (when users exist) -->
+                <div id="signin-panel" class="stack-gap">
+                    <div class="field">
+                        <label class="field-label">
+                            User · ব্যবহারকারী
+                        </label>
+                        <select id="login-user" class="field-input">
+                            <!-- Filled by JS -->
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="field-label">
+                            PIN · পিন
+                        </label>
+                        <input type="password" id="login-pin" class="field-input" maxlength="6" placeholder="Enter PIN" inputmode="numeric" autocomplete="off">
+                    </div>
+                    <button id="btn-login" class="btn btn-primary btn-xl" type="button">
+                        ➜ Enter POS · প্রবেশ করুন
+                    </button>
+                    <div class="hint-row">
+                        <span class="hint-text">
+                            Keyboard: <code>Enter</code> to login
+                        </span>
+                    </div>
+                    <p class="card-sub">
+                        Local browser-based POS. সব ডেটা শুধুমাত্র এই ডিভাইসে (LocalStorage).
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MAIN POS SCREEN -->
+    <section id="main-screen" class="hidden main-layout">
+        <!-- TOP NAV TABS -->
+        <nav class="nav-tabs">
+            <button class="nav-btn nav-btn-active" data-tab="tab-sale">
+                <span>POS</span>
+                <span class="sub">নতুন বিক্রয় (Alt+1)</span>
+            </button>
+            <button class="nav-btn" data-tab="tab-customers">
+                <span>Customers</span>
+                <span class="sub">গ্রাহক (Alt+2)</span>
+            </button>
+            <button class="nav-btn" data-tab="tab-products">
+                <span>Products</span>
+                <span class="sub">পণ্য (Alt+3)</span>
+            </button>
+            <button class="nav-btn" data-tab="tab-sales">
+                <span>Sales</span>
+                <span class="sub">সব বিক্রয় (Alt+4)</span>
+            </button>
+            <button class="nav-btn" data-tab="tab-reports">
+                <span>Reports</span>
+                <span class="sub">রিপোর্ট (Alt+5)</span>
+            </button>
+            <button class="nav-btn nav-admin-only" data-tab="tab-admin">
+                <span>Admin</span>
+                <span class="sub">সেটিংস · ব্যাকআপ (Alt+6)</span>
+            </button>
+        </nav>
+
+        <!-- TAB: POS SALE -->
+        <div id="tab-sale" class="tab-content hidden">
+            <div class="grid-main">
+                <!-- LEFT: NEW SALE & OPEN SALES -->
+                <div class="stack-gap">
+                <div class="card">
+                        <div class="card-header sale-card-header">
+                        <h2 class="card-title">
+                            New Sale
+                            <span class="subheader-bn">· নতুন বিক্রয়</span>
+                            <span id="summary-sale-id-display" class="badge sale-id-display">Sale ID: <span id="summary-sale-id-value">New</span></span>
+                        </h2>
+                        <div class="sale-header-right">
+                            <div id="sale-header-total" class="sale-header-total">৳ 0.00</div>
+                        </div>
+                    </div>
+                   
+                    <div class="card-body stack-gap">
+                        <!-- Product search + overlay (left) and customer moved to right panel -->
+                        <div class="search-bar-row">
+                            <input id="product-search" type="text" class="field-input large"
+                                   placeholder="Search by name, SKU, or barcode... (Alt+P)" autocomplete="off">
+                            <button id="btn-clear-product-search" class="btn btn-ghost" type="button" title="Clear search">✕</button>
+                            <button id="toggle-all-products" class="btn btn-ghost btn-toggle" type="button" aria-pressed="false">All products</button>
+                        </div>
+
+                        <div id="product-overlay" class="product-overlay hidden">
+                            <div class="product-overlay-inner">
+                                <table>
+                                    <thead>
+                                        <tr><th>Product</th><th>SKU</th><th>Barcode</th><th>Category</th><th>Sell</th><th>Stock</th><th></th></tr>
+                                    </thead>
+                                    <tbody id="product-overlay-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Cart (products list removed; overlay used instead) -->
+                        <div>
+                            <div class="section-header">
+                                <span class="section-title">
+                                    Cart · কার্ট
+                                </span>
+                                <div class="section-sub-group">
+                                    <span id="cart-count-chip" class="cart-count-chip hidden">0 items</span>
+                                    <span class="section-sub">
+                                        Current sale
+                                    </span>
+                                </div>
+                            </div>
+                            <div id="cart-table-wrapper" class="table-wrapper table-large">
+                                <table>
+                                    <thead>
+                                    <tr>
+                                        <th style="width: 38%;">Item</th>
+                                        <th>Qty</th>
+                                        <th>Price</th>
+                                        <th>Total</th>
+                                        <th></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="cart-table-body">
+                                    <!-- Filled by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="cart-empty-state" class="empty-state hidden">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                                </svg>
+                                <h3>Cart is empty</h3>
+                                <p>Search or scan a product to add it to this sale.</p>
+                            </div>
+                        </div>
+
+                        <!-- Sale actions -->
+                        <div id="sale-actions-row" class="sale-control-row">
+
+                            <div class="sale-buttons">
+                                <button id="btn-new-sale" class="btn btn-ghost btn-xl" type="button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                    </svg>
+                                    New sale (Alt+N)
+                                </button>
+                                <button id="btn-hold-sale" class="btn btn-accent btn-xl" type="button">
+                                    ⏸ Hold / Save Open (Alt+H)
+                                </button>
+                                <button id="btn-cancel-sale" class="btn btn-ghost btn-xl" type="button">
+                                    ✕ Cancel Open
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Open Sales Card -->
+                <div id="open-sales-card" class="card hidden">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            Open Sales
+                            <span class="subheader-bn">· চলমান বিক্রয়</span>
+                        </h2>
+                        <p class="card-sub">Use Resume to bring a held sale back to the cart</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrapper">
+                            <table class="open-sales-table">
+                                <thead>
+                                    <tr>
+                                        <th>Sale ID</th>
+                                        <th>Customer</th>
+                                        <th>Items</th>
+                                        <th>Total</th>
+                                        <th>Time</th>
+                                        <th style="width: 80px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="open-sales-list">
+                                    <!-- JS fills open sales rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                <!-- RIGHT: TOTALS / PAYMENT / RECEIPT -->
+                <div class="stack-gap">
+                    <!-- Customer card (moved above payment) -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">
+                                Customer
+                                <span class="subheader-bn">· গ্রাহক</span>
+                            </h2>
+                        </div>
+                        <div class="card-body stack-gap">
+                            <div class="field" style="position:relative">
+                                <label class="field-label">Customer Phone · গ্রাহকের মোবাইল</label>
+                                <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                    <div class="input-row" style="flex: 1; margin: 0;">
+                                        <input id="sale-customer-phone" type="tel" class="field-input"
+                                               placeholder="e.g. 017XXXXXXXX" inputmode="tel" autocomplete="off">
+                                        <button id="btn-clear-customer-phone" class="btn btn-ghost btn-lg" type="button" title="Clear">✕</button>
+                                        <button id="btn-search-customer" class="btn btn-ghost btn-lg" type="button">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <span id="summary-customer-badge" class="customer-badge">Walk-in</span>
+                                </div>
+                                <!-- customer overlay positioned relative to field container -->
+                                <div id="customer-overlay" class="product-overlay hidden">
+                                    <div class="product-overlay-inner">
+                                        <table>
+                                            <thead>
+                                                <tr><th>Name</th><th>Phone</th><th></th></tr>
+                                            </thead>
+                                            <tbody id="customer-overlay-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Customer Name · গ্রাহকের নাম</label>
+                                <input id="sale-customer-name" type="text" class="field-input" placeholder="Name" autocomplete="off">
+                            </div>
+                            <div class="quick-add-small">
+                                <input id="quick-customer-name" type="text" class="field-input field-input-sm" placeholder="Quick name">
+                                <input id="quick-customer-notes" type="text" class="field-input field-input-sm" placeholder="Notes">
+                                <button id="btn-save-quick-customer" class="btn btn-accent btn-md" type="button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                    </svg>
+                                    Save
+                                </button>
+                                <button id="btn-clear-customer" class="btn btn-ghost btn-md" type="button">✕ Clear</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment & Summary card -->
+                    <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            Payment &amp; Summary
+                            <span class="subheader-bn">· পেমেন্ট সারাংশ</span>
+                        </h2>
+                        <p class="card-sub">
+                            Discounts, payment and change. Keyboard: Alt+C to complete.
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <div class="stack-gap-none">
+                            <!-- Subtotal (read-only) -->
+                            <div class="payment-row">
+                                <label class="payment-label">Subtotal · সাবটোটাল</label>
+                                <div id="summary-subtotal" class="payment-value money">৳ 0.00</div>
+                            </div>
+
+                            <!-- Discount input -->
+                            <div class="payment-row">
+                                <label class="payment-label" for="input-discount">Discount (৳) · ছাড়</label>
+                                <input id="input-discount" type="number" class="payment-input-clean"
+                                    value="0" min="0" step="1">
+                            </div>
+
+                            <!-- Total (read-only, emphasized) -->
+                            <div class="payment-row payment-row-total">
+                                <label class="payment-label">Total Payable · মোট</label>
+                                <div id="summary-total" class="payment-value money payment-total">৳ 0.00</div>
+                            </div>
+
+                            <!-- Payment input with "Same as Payable" button -->
+                            <div class="payment-row">
+                                <label class="payment-label" for="input-payment">Payment Received · প্রাপ্ত</label>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <button id="btn-same-as-total" class="btn btn-ghost btn-md" type="button">
+                                        Same as Payable
+                                    </button>
+                                    <input id="input-payment" type="number" class="payment-input-clean"
+                                        value="0" min="0" step="1" style="flex: 1;">
+                                </div>
+                            </div>
+
+                            <!-- Change (read-only) -->
+                            <div class="payment-row">
+                                <label class="payment-label">Change · ফেরত</label>
+                                <div id="summary-change" class="payment-value money">৳ 0.00</div>
+                            </div>
+
+                            <!-- Sale info -->
+                            <div class="payment-row">
+                                <label class="payment-label">Items in Cart</label>
+                                <div id="summary-items-count" class="payment-value">0</div>
+                            </div>
+
+                            <div class="payment-row">
+                                <label class="payment-label">Sale Status</label>
+                                <div id="summary-sale-status" class="payment-value">New</div>
+                            </div>
+                        </div>
+
+                        <div class="sale-actions-bottom">
+                            <button id="btn-complete-sale" class="btn btn-primary btn-xxl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                                Complete &amp; Close Sale (Alt+C)
+                            </button>
+                            <button id="btn-clear-cart" class="btn btn-ghost btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Clear cart
+                            </button>
+                        </div>
+
+                        <div class="section-separator"></div>
+
+                        <div class="receipt-actions">
+                            <div class="field">
+                                <label class="field-label">Receipt size · রিসিপ্ট সাইজ</label>
+                                <select id="receipt-size" class="field-input field-input-sm">
+                                    <option value="a4">A4 (ফুল সাইজ)</option>
+                                    <option value="80mm">80mm roll</option>
+                                    <option value="58mm">58mm roll</option>
+                                </select>
+                            </div>
+                            <button id="btn-print-last-receipt" class="btn btn-ghost btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
+                                </svg>
+                                Print last receipt (Alt+R)
+                            </button>
+                        </div>
+
+                        <div class="summary-card small">
+                            <div class="summary-header">
+                                <span>Today snapshot · আজকের সারাংশ</span>
+                                <span id="today-summary-small" class="summary-meta">—</span>
+                            </div>
+                            <div class="summary-meta">
+                                Salesperson: <span id="today-salesperson-name">—</span><br>
+                                Last sale: <span id="today-last-sale">—</span>
+                            </div>
+                        </div>
+
+                        <div class="keyboard-help collapsed">
+                            <div class="keyboard-help-header">
+                                <h3 style="margin:0">Keyboard shortcuts</h3>
+                                <button id="btn-toggle-keyboard-help" class="btn btn-ghost" aria-expanded="false" type="button">Show</button>
+                            </div>
+                            <div class="keyboard-help-body" id="keyboard-help-body">
+                                <ul>
+                                    <li>Alt+1..6: Switch tabs (POS, Customers, Products, Sales, Reports, Admin)</li>
+                                    <li>Alt+F: Focus customer phone</li>
+                                    <li>Alt+P: Focus product search</li>
+                                    <li>Alt+N: New sale</li>
+                                    <li>Alt+H: Hold / save open sale</li>
+                                    <li>Alt+C: Complete sale</li>
+                                    <li>Alt+R: Print last receipt</li>
+                                    <li>Esc: Close popups / blur field</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <!-- HIDDEN RECEIPT (for printing) -->
+            <div id="receipt-print" class="receipt-print">
+                <div class="receipt-inner">
+                    <h2 id="receipt-shop-name">Shop Name</h2>
+                    <div id="receipt-shop-address">Address</div>
+                    <div id="receipt-shop-phone">Phone</div>
+                    <hr>
+                    <div id="receipt-sale-meta"></div>
+                    <table class="receipt-table">
+                        <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                        </tr>
+                        </thead>
+                        <tbody id="receipt-items-body"></tbody>
+                    </table>
+                    <hr>
+                    <div class="receipt-totals">
+                        <div><span>Subtotal</span><span id="receipt-subtotal"></span></div>
+                        <div><span>Discount</span><span id="receipt-discount"></span></div>
+                        <div><span>Total</span><span id="receipt-total"></span></div>
+                        <div><span>Payment</span><span id="receipt-payment"></span></div>
+                        <div><span>Change</span><span id="receipt-change"></span></div>
+                    </div>
+                    <p class="receipt-note">ধন্যবাদ! আবার আসবেন।</p>
+                </div>
+            </div>
+        </div>
+        <!-- END TAB: POS SALE -->
+
+        <!-- TAB: CUSTOMERS -->
+        <div id="tab-customers" class="tab-content hidden">
+            <div class="grid-two">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            Customers
+                            <span class="subheader-bn">· গ্রাহক তালিকা</span>
+                        </h2>
+                        <p class="card-sub">
+                            Phone-centered customer management. ফোন নম্বর দিয়ে খুঁজুন।
+                        </p>
+                    </div>
+                    <div class="card-body stack-gap">
+                        <div class="filter-row">
+                            <input id="customer-search" type="text" class="field-input"
+                                   placeholder="Search by name or phone..." autocomplete="off">
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th style="width: 32%;">Name</th>
+                                    <th style="width: 22%;" class="center">Phone</th>
+                                    <th>Notes</th>
+                                    <th style="width: 20%;">Last sale</th>
+                                </tr>
+                                </thead>
+                                <tbody id="customers-table-body">
+                                <!-- Filled by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            Edit Customer
+                            <span class="subheader-bn">· গ্রাহক সম্পাদনা</span>
+                        </h2>
+                        <p class="card-sub">
+                            Tap a row to load. Saving uses phone as unique key.
+                        </p>
+                    </div>
+                    <div class="card-body stack-gap">
+                        <div class="two-col">
+                            <div class="field">
+                                <label class="field-label">Name</label>
+                                <input id="customer-edit-name" type="text" class="field-input" autocomplete="off">
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Phone</label>
+                                <input id="customer-edit-phone" type="tel" class="field-input" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="field-label">Notes</label>
+                            <input id="customer-edit-notes" type="text" class="field-input" autocomplete="off">
+                        </div>
+                        <div class="input-row">
+                            <button id="btn-save-customer-edit" class="btn btn-primary btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-12L10.125 2.25z" />
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 17.25h-9m9-4.5h-9m5.25-9v6.75h-6.75" />
+                                </svg>
+                                Save customer
+                            </button>
+                            <button id="btn-new-customer" class="btn btn-ghost btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                New
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: PRODUCTS -->
+        <div id="tab-products" class="tab-content hidden">
+            <div class="grid-main">
+                <!-- LEFT COLUMN: Products List -->
+                <div class="stack-gap">
+                    <div class="card">
+                        <div class="card-header">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div style="flex: 1;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <h2 class="card-title" style="margin: 0;">Products</h2>
+                                        <span class="subheader-bn">· পণ্যসমূহ</span>
+                                    </div>
+                                    <p class="card-sub" style="margin-top: 4px;">
+                                        Buying price, selling price, stock &amp; low-stock warnings.
+                                    </p>
+                                </div>
+                                <span class="badge" id="product-count-badge" style="background: var(--primary); color: white; padding: 4px 12px; border-radius: 12px; font-size: 13px; white-space: nowrap;">0 products</span>
+                            </div>
+                        </div>
+                        <div class="card-body stack-gap">
+                            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                <input id="product-manage-search" type="text" class="field-input"
+                                       placeholder="Search by name, SKU, barcode, or category..." autocomplete="off" style="flex: 1; min-width: 250px;">
+                                <select id="product-filter-category" class="field-input" style="min-width: 180px;">
+                                    <option value="">All Categories</option>
+                                    <!-- Filled by JS -->
+                                </select>
+                                <select id="product-sort" class="field-input" style="min-width: 150px;">
+                                    <option value="name-asc">Name (A-Z)</option>
+                                    <option value="name-desc">Name (Z-A)</option>
+                                    <option value="buy-asc">Buy Price (Low-High)</option>
+                                    <option value="buy-desc">Buy Price (High-Low)</option>
+                                    <option value="sell-asc">Sell Price (Low-High)</option>
+                                    <option value="sell-desc">Sell Price (High-Low)</option>
+                                    <option value="stock-asc">Stock (Low-High)</option>
+                                    <option value="stock-desc">Stock (High-Low)</option>
+                                </select>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; white-space: nowrap;">
+                                    <input id="product-filter-low-stock" type="checkbox" style="cursor: pointer;">
+                                    <span>Low stock</span>
+                                </label>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span id="product-total-count" style="font-size: 14px; color: var(--text-soft); font-weight: 500;">0 total | Showing page 1 of 1</span>
+                                <div style="display: flex; gap: 8px;">
+                                    <button id="btn-product-prev-page" class="btn btn-ghost" type="button" disabled>&lt; Prev</button>
+                                    <button id="btn-product-next-page" class="btn btn-ghost" type="button" disabled>Next &gt;</button>
+                                </div>
+                            </div>
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                    <tr>
+                                        <th style="width: 80px;">ID</th>
+                                        <th style="width: 25%;">Name</th>
+                                        <th>SKU</th>
+                                        <th>Barcode</th>
+                                        <th>Category</th>
+                                        <th>Buy (৳)</th>
+                                        <th>Sell (৳)</th>
+                                        <th>Stock</th>
+                                        <th>Low?</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="products-table-body">
+                                    <!-- Filled by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: Forms -->
+                <div class="stack-gap">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <h2 class="card-title">
+                                    Add / Edit Product
+                                    <span class="subheader-bn">· পণ্য যোগ/সম্পাদনা</span>
+                                </h2>
+                                <p class="card-sub">
+                                    Tap a product row to load. Use SKU as unique identifier.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="card-body stack-gap">
+                            <div class="two-col">
+                                <div class="field">
+                                    <label class="field-label">Name</label>
+                                    <input id="product-edit-name" type="text" class="field-input" autocomplete="off">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">SKU</label>
+                                    <input id="product-edit-sku" type="text" class="field-input" autocomplete="off">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Barcode (optional)</label>
+                                    <input id="product-edit-barcode" type="text" class="field-input" autocomplete="off" placeholder="Scan or enter barcode">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Category (optional)</label>
+                                    <input id="product-edit-category" type="text" class="field-input" autocomplete="off" placeholder="e.g., Electronics, Food, etc." list="category-suggestions">
+                                    <datalist id="category-suggestions">
+                                        <!-- Filled by JS -->
+                                    </datalist>
+                                </div>
+                            </div>
+                        <div class="two-col">
+                            <div class="field">
+                                <label class="field-label">Buying Price (৳)</label>
+                                <input id="product-edit-buy" type="number" class="field-input" min="0" step="1">
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Selling Price (৳)</label>
+                                <input id="product-edit-sell" type="number" class="field-input" min="0" step="1">
+                            </div>
+                        </div>
+                        <div class="two-col">
+                            <div class="field">
+                                <label class="field-label">Stock</label>
+                                <input id="product-edit-stock" type="number" class="field-input" min="0" step="1">
+                                <p class="hint-text" style="margin-top: 4px; font-size: 12px;">Stock can only be set for new products. For existing products, use stock adjustment below.</p>
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Low stock alert at</label>
+                                <input id="product-edit-low" type="number" class="field-input" min="0" step="1">
+                            </div>
+                        </div>
+                        <div class="input-row">
+                            <button id="btn-save-product" class="btn btn-primary btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-12L10.125 2.25z" />
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 17.25h-9m9-4.5h-9m5.25-9v6.75h-6.75" />
+                                </svg>
+                                Save product
+                            </button>
+                            <button id="btn-new-product" class="btn btn-ghost btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                New
+                            </button>
+                            <button id="btn-delete-product" class="btn btn-ghost btn-xl" type="button" style="display: none; color: var(--danger); margin-left: auto;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                </svg>
+                                Delete
+                            </button>
+                        </div>
+                        <p class="hint-text">
+                            Low stock products will be highlighted with warning badge.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Stock Adjustment Card (only visible for existing products) -->
+                <div id="stock-adjustment-card" class="card" style="display: none;">
+                    <div class="card-header">
+                        <div>
+                            <span class="card-title">Stock Adjustment</span>
+                            <p class="card-sub">
+                                Update inventory for selected product. Current stock: <strong id="stock-current-value">0</strong>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="card-body stack-gap">
+                        <div class="two-col">
+                            <div class="field">
+                                <label class="field-label">Adjustment Quantity</label>
+                                <input id="stock-adjustment-qty" type="number" class="field-input" step="1" placeholder="e.g., 10 or -5">
+                                <p class="hint-text" style="margin-top: 4px; font-size: 12px;">Positive = add stock, Negative = reduce stock</p>
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Date</label>
+                                <input id="stock-adjustment-date" type="date" class="field-input">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="field-label">Note (optional)</label>
+                            <input id="stock-adjustment-note" type="text" class="field-input" placeholder="e.g., New shipment, Damaged items, etc.">
+                        </div>
+                        <div class="input-row">
+                            <button id="btn-save-stock-adjustment" class="btn btn-primary btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                                Apply Adjustment
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stock Updates Log Card (collapsible) -->
+                <div id="stock-updates-card" class="card" style="display: none;">
+                    <div class="card-header" style="cursor: pointer;" id="stock-updates-header">
+                        <div>
+                            <span class="card-title">Stock Update History</span>
+                            <p class="card-sub">
+                                View all stock adjustments for this product
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-ghost" id="btn-toggle-stock-updates" style="margin-left: auto;">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                            </svg>
+                            Expand
+                        </button>
+                    </div>
+                    <div class="card-body stack-gap" id="stock-updates-body" style="display: none;">
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Change</th>
+                                        <th>Before</th>
+                                        <th>After</th>
+                                        <th>Note</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stock-updates-table-body">
+                                    <!-- Filled by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: SALES (LIST / FILTER) -->
+        <div id="tab-sales" class="tab-content hidden">
+            <div class="card card-full">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        All Sales
+                        <span class="subheader-bn">· সব বিক্রয়</span>
+                    </h2>
+                    <p class="card-sub">
+                        Filter by date range, status, salesperson, customer.
+                    </p>
+                </div>
+                <div class="card-body stack-gap">
+                    <div class="filter-row wrap">
+                        <div class="field small-field">
+                            <label class="field-label">From date</label>
+                            <input id="sales-filter-from" type="date" class="field-input field-input-sm">
+                        </div>
+                        <div class="field small-field">
+                            <label class="field-label">To date</label>
+                            <input id="sales-filter-to" type="date" class="field-input field-input-sm">
+                        </div>
+                        <div class="field small-field">
+                            <label class="field-label">Status</label>
+                            <select id="sales-filter-status" class="field-input field-input-sm">
+                                <option value="all">All</option>
+                                <option value="open">Open</option>
+                                <option value="closed">Closed</option>
+                            </select>
+                        </div>
+                        <div class="field small-field">
+                            <label class="field-label">Salesperson</label>
+                            <select id="sales-filter-user" class="field-input field-input-sm">
+                                <option value="all">All</option>
+                            </select>
+                        </div>
+                        <div class="field grow">
+                            <label class="field-label">Search (customer, phone, sale ID)</label>
+                            <input id="sales-filter-query" type="text" class="field-input field-input-sm" autocomplete="off">
+                        </div>
+                        <button id="btn-sales-clear-filters" class="btn btn-ghost btn-xl" type="button">
+                            ⟳ Clear filters
+                        </button>
+                    </div>
+                    <div class="table-wrapper table-tall">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th style="width: 16%;">Date / Time</th>
+                                <th style="width: 18%;">Customer</th>
+                                <th>Phone</th>
+                                <th>Salesperson</th>
+                                <th>Status</th>
+                                <th>Items</th>
+                                <th>Total (৳)</th>
+                                <th>Profit (৳)</th>
+                            </tr>
+                            </thead>
+                            <tbody id="sales-table-body">
+                            <!-- Filled by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: REPORTS -->
+        <div id="tab-reports" class="tab-content hidden">
+            <div class="grid-two">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            KPIs &amp; Chart
+                            <span class="subheader-bn">· সারাংশ</span>
+                        </h2>
+                        <p class="card-sub">
+                            Total sales, today’s sales, customers, and profit.
+                        </p>
+                    </div>
+                    <div class="card-body stack-gap">
+                        <div class="kpi-grid">
+                            <div class="kpi-card">
+                                <div class="kpi-label">Total sales value · মোট বিক্রয়</div>
+                                <div id="kpi-total-sales" class="kpi-value">৳ 0.00</div>
+                                <div id="kpi-total-sales-count" class="kpi-sub">0 invoices</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Today’s sales · আজকের বিক্রয়</div>
+                                <div id="kpi-today-sales" class="kpi-value">৳ 0.00</div>
+                                <div id="kpi-today-sales-count" class="kpi-sub">0 invoices</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Total profit · মোট লাভ</div>
+                                <div id="kpi-total-profit" class="kpi-value">৳ 0.00</div>
+                                <div id="kpi-profit-margin" class="kpi-sub">—</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Customers · গ্রাহক সংখ্যা</div>
+                                <div id="kpi-customers-count" class="kpi-value">0</div>
+                                <div class="kpi-sub">Unique phone numbers</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Open sales · চলমান বিক্রয়</div>
+                                <div id="kpi-open-sales" class="kpi-value">0</div>
+                                <div class="kpi-sub">Can be resumed</div>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="field-label">
+                                Last 7 days chart · গত ৭ দিনের বিক্রয়
+                            </label>
+                            <canvas id="salesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card card-printable-report">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            Export / Print Report
+                            <span class="subheader-bn">· রিপোর্ট এক্সপোর্ট</span>
+                        </h2>
+                        <p class="card-sub">
+                            Export sales report as CSV or print a clean summary.
+                        </p>
+                    </div>
+                    <div class="card-body stack-gap">
+                        <div class="field">
+                            <label class="field-label">
+                                Report period
+                            </label>
+                            <div class="filter-row">
+                                <input id="report-from" type="date" class="field-input field-input-sm">
+                                <input id="report-to" type="date" class="field-input field-input-sm">
+                            </div>
+                        </div>
+                        <div class="input-row">
+                            <button id="btn-export-csv" class="btn btn-primary btn-xl" type="button">
+                                ⬇ Export CSV
+                            </button>
+                            <button id="btn-print-report" class="btn btn-ghost btn-xl" type="button">
+                                🖨 Print report
+                            </button>
+                        </div>
+                        <div id="report-print-area" class="report-print-area">
+                            <h2>Sales report</h2>
+                            <p id="report-print-period">Period: —</p>
+                            <table class="report-print-table">
+                                <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Invoices</th>
+                                    <th>Total (৳)</th>
+                                    <th>Profit (৳)</th>
+                                </tr>
+                                </thead>
+                                <tbody id="report-print-body">
+                                <!-- Filled by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: ADMIN (SETTINGS / USERS / BACKUP) -->
+        <div id="tab-admin" class="tab-content hidden">
+            <div class="grid-two">
+                <!-- SHOP SETTINGS -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            Shop Settings
+                            <span class="subheader-bn">· দোকান তথ্য</span>
+                        </h2>
+                        <p class="card-sub">
+                            Set shop name, address, phone. Used in header and receipts.
+                        </p>
+                    </div>
+                    <div class="card-body stack-gap">
+                        <div class="field">
+                            <label class="field-label">Shop Name</label>
+                            <input id="shop-name" type="text" class="field-input" autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label class="field-label">Address</label>
+                            <input id="shop-address" type="text" class="field-input" autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label class="field-label">Phone</label>
+                            <input id="shop-phone" type="text" class="field-input" autocomplete="off">
+                        </div>
+                        <button id="btn-save-shop-settings" class="btn btn-primary btn-xl" type="button">
+                            💾 Save settings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- USERS MANAGEMENT -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            Users &amp; Roles
+                            <span class="subheader-bn">· ব্যবহারকারী</span>
+                        </h2>
+                        <p class="card-sub">
+                            Manage Superadmin and Salesperson accounts.
+                        </p>
+                    </div>
+                    <div class="card-body stack-gap">
+                        <div class="table-wrapper small-table">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th style="width: 30%;">Name</th>
+                                    <th>Username</th>
+                                    <th>Role</th>
+                                </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                <!-- Filled by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="two-col">
+                            <div class="field">
+                                <label class="field-label">Name</label>
+                                <input id="user-edit-name" type="text" class="field-input" autocomplete="off">
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Username</label>
+                                <input id="user-edit-username" type="text" class="field-input" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="two-col">
+                            <div class="field">
+                                <label class="field-label">PIN</label>
+                                <input id="user-edit-pin" type="password" class="field-input" maxlength="6" autocomplete="off">
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Role</label>
+                                <select id="user-edit-role" class="field-input">
+                                    <option value="sales">Salesperson</option>
+                                    <option value="superadmin">Superadmin</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-row">
+                            <button id="btn-save-user" class="btn btn-primary btn-xl" type="button">
+                                💾 Save user
+                            </button>
+                            <button id="btn-new-user" class="btn btn-ghost btn-xl" type="button">
+                                + New
+                            </button>
+                        </div>
+                        <p class="hint-text">
+                            Username is unique. Changing PIN will overwrite existing.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BACKUP / RESTORE -->
+            <div class="card card-full">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        Backup &amp; Restore
+                        <span class="subheader-bn">· ব্যাকআপ</span>
+                    </h2>
+                    <p class="card-sub">
+                        Download a JSON backup of products, customers, sales, users, and settings.
+                        Restore only if you trust the file.
+                    </p>
+                </div>
+                <div class="card-body stack-gap">
+                    <div class="input-row">
+                        <button id="btn-backup-download" class="btn btn-primary btn-xl" type="button">
+                            ⬇ Download backup (JSON)
+                        </button>
+                        <label class="btn btn-ghost btn-xl file-label">
+                            ⬆ Restore from file
+                            <input id="backup-file-input" type="file" accept=".json" hidden>
+                        </label>
+                    </div>
+                    <p class="hint-text">
+                        Backup includes: users, products, customers, sales, and shop settings. Restoring will replace
+                        current local data.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- Core application logic -->
+<script src="app.js"></script>
+</body>
+</html>
