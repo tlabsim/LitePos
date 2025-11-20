@@ -93,8 +93,20 @@
         // Apply search filter
         let filtered = allProducts.filter(p => {
             if (query) {
-                const txt = (p.name + ' ' + p.sku + ' ' + (p.barcode || '') + ' ' + (p.category || '') + ' ' + (p.brand || '') + ' ' + (p.supplier || '')).toLowerCase();
-                if (!txt.includes(query)) return false;
+                // Check name, SKU, category, brand, supplier
+                const nameMatch = (p.name || '').toLowerCase().includes(query);
+                const skuMatch = (p.sku || '').toLowerCase().includes(query);
+                const categoryMatch = (p.category || '').toLowerCase().includes(query);
+                const brandMatch = (p.brand || '').toLowerCase().includes(query);
+                const supplierMatch = (p.supplier || '').toLowerCase().includes(query);
+                
+                // Check each barcode using substring matching
+                const barcodes = (p.barcode || '').split(',').map(b => b.trim().toLowerCase());
+                const barcodeMatch = barcodes.some(bc => bc.includes(query));
+                
+                if (!(nameMatch || skuMatch || categoryMatch || brandMatch || supplierMatch || barcodeMatch)) {
+                    return false;
+                }
             }
             return true;
         });
@@ -189,8 +201,10 @@
             tr.appendChild(tdSku);
             
             const tdBarcode = document.createElement('td'); 
+            tdBarcode.className = 'barcode-cell';
             tdBarcode.textContent = p.barcode || '—'; 
             tdBarcode.style.fontSize = '12px'; 
+            tdBarcode.title = p.barcode || ''; // Show full barcode on hover
             tr.appendChild(tdBarcode);
             
             const tdCategory = document.createElement('td'); 
@@ -220,9 +234,9 @@
             tdStock.textContent = String(p.stock); 
             tr.appendChild(tdStock);
             
-            const tdLow = document.createElement('td'); 
-            tdLow.textContent = p.stock <= (p.lowStockAt || 0) ? 'Yes' : ''; 
-            tr.appendChild(tdLow);
+            // const tdLow = document.createElement('td'); 
+            // tdLow.textContent = p.stock <= (p.lowStockAt || 0) ? 'Yes' : ''; 
+            // tr.appendChild(tdLow);
 
             tbody.appendChild(tr);
         });
@@ -350,10 +364,6 @@
     function renderProductSearchTable() {
         const els = _getEls();
         const db = _getDb();
-        const overlayBody = _getById('product-overlay-body');
-        const tbody = overlayBody || _getEl('product-table-body');
-        if (!tbody) return;
-        tbody.innerHTML = '';
         const query = (_getEl('product-search') && _getEl('product-search').value || '').trim().toLowerCase();
         const toggleEl = _getEl('toggle-all-products');
         let showAll = false;
@@ -365,25 +375,65 @@
         const products = db.products || [];
         const filtered = products.filter(p => {
             if (!query) return true;
-            const text = (p.name + ' ' + p.sku + ' ' + (p.barcode || '') + ' ' + (p.category || '')).toLowerCase();
-            return text.includes(query);
+            
+            // Check name, SKU, category
+            const nameMatch = (p.name || '').toLowerCase().includes(query);
+            const skuMatch = (p.sku || '').toLowerCase().includes(query);
+            const categoryMatch = (p.category || '').toLowerCase().includes(query);
+            
+            // Check each barcode using substring matching
+            const barcodes = (p.barcode || '').split(',').map(b => b.trim().toLowerCase());
+            const barcodeMatch = barcodes.some(bc => bc.includes(query));
+            
+            return nameMatch || skuMatch || categoryMatch || barcodeMatch;
         });
 
-        // Ensure table structure exists for product overlay
-        if (_getById('product-overlay') && filtered.length > 0) {
+        // Handle product overlay rendering
+        if (_getById('product-overlay')) {
             const overlay = _getById('product-overlay');
             const overlayInner = overlay.querySelector('.product-overlay-inner');
-            if (overlayInner && !overlayInner.querySelector('table')) {
-                overlayInner.innerHTML = `
-                    <table>
-                        <thead>
-                            <tr><th>Product</th><th>SKU</th><th>Barcode</th><th>Category</th><th>Sell</th><th>Stock</th><th></th></tr>
-                        </thead>
-                        <tbody id="product-overlay-body"></tbody>
-                    </table>
-                `;
+            
+            if (query.length > 0 || showAll) {
+                overlay.classList.remove('hidden');
+                
+                // Show empty state if no results
+                if (filtered.length === 0) {
+                    if (overlayInner) {
+                        overlayInner.innerHTML = `
+                            <div style="padding: 40px 20px; text-align: center; color: var(--text-soft);">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 48px; height: 48px; margin: 0 auto 12px; opacity: 0.5;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                                </svg>
+                                <div style="font-size: 15px; font-weight: 500; margin-bottom: 4px;">No products found</div>
+                                <div style="font-size: 13px; opacity: 0.7;">Try a different search term</div>
+                            </div>
+                        `;
+                    }
+                    return; // Exit early for empty state
+                } else {
+                    // Restore table structure if needed
+                    const existingTable = overlayInner?.querySelector('table');
+                    if (overlayInner && !existingTable) {
+                        overlayInner.innerHTML = `
+                            <table>
+                                <thead>
+                                    <tr><th>Product</th><th>SKU</th><th>Barcode</th><th>Category</th><th>Sell</th><th>Stock</th><th></th></tr>
+                                </thead>
+                                <tbody id="product-overlay-body"></tbody>
+                            </table>
+                        `;
+                    }
+                }
+            } else {
+                overlay.classList.add('hidden');
             }
         }
+
+        // Get tbody element (after potentially restoring table structure)
+        const overlayBody = _getById('product-overlay-body');
+        const tbody = overlayBody || _getEl('product-table-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
 
         filtered.forEach((p, idx) => {
             const tr = document.createElement('tr');
@@ -393,7 +443,13 @@
 
             const tdName = document.createElement('td'); tdName.textContent = p.name; tr.appendChild(tdName);
             const tdSku = document.createElement('td'); tdSku.textContent = p.sku; tr.appendChild(tdSku);
-            const tdBarcode = document.createElement('td'); tdBarcode.textContent = p.barcode || '—'; tdBarcode.style.fontSize = '12px'; tdBarcode.style.color = 'var(--text-soft)'; tr.appendChild(tdBarcode);
+            const tdBarcode = document.createElement('td'); 
+            tdBarcode.className = 'barcode-cell';
+            tdBarcode.textContent = p.barcode || '—'; 
+            tdBarcode.style.fontSize = '12px'; 
+            tdBarcode.style.color = 'var(--text-soft)'; 
+            tdBarcode.title = p.barcode || ''; // Show full barcode on hover
+            tr.appendChild(tdBarcode);
             const tdCategory = document.createElement('td'); tdCategory.textContent = p.category || '—'; tdCategory.style.fontSize = '12px'; tr.appendChild(tdCategory);
             const tdSell = document.createElement('td'); tdSell.textContent = formatMoney(p.sellPrice); tr.appendChild(tdSell);
             const tdStock = document.createElement('td'); tdStock.textContent = String(p.stock); if (p.stock <= (p.lowStockAt || 0)) tdStock.style.color = '#facc15'; tr.appendChild(tdStock);
@@ -406,31 +462,8 @@
             tbody.appendChild(tr);
         });
 
-        // If rendering into the overlay, control overlay visibility
+        // Ensure toggle binds to re-render (support checkbox or button)
         if (_getById('product-overlay')) {
-            const overlay = _getById('product-overlay');
-            if (query.length > 0 || showAll) {
-                overlay.classList.remove('hidden');
-                // Show empty state if no results
-                if (filtered.length === 0) {
-                    const overlayInner = overlay.querySelector('.product-overlay-inner');
-                    if (overlayInner) {
-                        overlayInner.innerHTML = `
-                            <div style="padding: 40px 20px; text-align: center; color: var(--text-soft);">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 48px; height: 48px; margin: 0 auto 12px; opacity: 0.5;">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                                </svg>
-                                <div style="font-size: 15px; font-weight: 500; margin-bottom: 4px;">No products found</div>
-                                <div style="font-size: 13px; opacity: 0.7;">Try a different search term</div>
-                            </div>
-                        `;
-                    }
-                }
-            } else {
-                overlay.classList.add('hidden');
-            }
-
-            // Ensure toggle binds to re-render (support checkbox or button)
             if (toggleEl && !toggleEl._productsToggleBound) {
                 toggleEl._productsToggleBound = true;
                 if (toggleEl.tagName === 'INPUT') {
@@ -448,7 +481,8 @@
 
             // Add keyboard navigation to product search input
             const searchInput = _getEl('product-search');
-            if (searchInput && !searchInput._keyboardNavBound) {
+            const overlayBody = _getById('product-overlay-body');
+            if (searchInput && overlayBody && !searchInput._keyboardNavBound) {
                 searchInput._keyboardNavBound = true;
                 searchInput.addEventListener('keydown', (ev) => {
                     const rows = Array.from(overlayBody.querySelectorAll('tr'));
@@ -513,8 +547,16 @@
         const p = db.products.find(pp => pp.id === id);
         if (!p) return;
         if (_getEl('product-edit-name')) _getEl('product-edit-name').value = p.name;
-        if (_getEl('product-edit-sku')) _getEl('product-edit-sku').value = p.sku;
-        if (_getEl('product-edit-barcode')) _getEl('product-edit-barcode').value = p.barcode || '';
+        if (_getEl('product-edit-sku')) _getEl('product-edit-sku').value = p.sku || '';
+        
+        // Load barcodes into tag input
+        if (p.barcode) {
+            const barcodeList = p.barcode.split(',').map(b => b.trim()).filter(b => b);
+            setBarcodes(barcodeList);
+        } else {
+            setBarcodes([]);
+        }
+        
         if (_getEl('product-edit-category')) _getEl('product-edit-category').value = p.category || '';
         if (_getEl('product-edit-brand')) _getEl('product-edit-brand').value = p.brand || '';
         if (_getEl('product-edit-supplier')) _getEl('product-edit-supplier').value = p.supplier || '';
@@ -563,7 +605,11 @@
         const els = _getEls();
         if (_getEl('product-edit-name')) _getEl('product-edit-name').value = '';
         if (_getEl('product-edit-sku')) _getEl('product-edit-sku').value = '';
+        
+        // Clear barcode tags
+        setBarcodes([]);
         if (_getEl('product-edit-barcode')) _getEl('product-edit-barcode').value = '';
+        
         if (_getEl('product-edit-category')) _getEl('product-edit-category').value = '';
         if (_getEl('product-edit-brand')) _getEl('product-edit-brand').value = '';
         if (_getEl('product-edit-supplier')) _getEl('product-edit-supplier').value = '';
@@ -599,7 +645,11 @@
         const db = _getDb();
         const name = (_getEl('product-edit-name') && _getEl('product-edit-name').value || '').trim();
         const sku = (_getEl('product-edit-sku') && _getEl('product-edit-sku').value || '').trim();
-        const barcode = (_getEl('product-edit-barcode') && _getEl('product-edit-barcode').value || '').trim();
+        
+        // Get barcodes from tag input (comma-separated string)
+        const barcodeList = getBarcodes();
+        const barcode = barcodeList.join(',');
+        
         const category = (_getEl('product-edit-category') && _getEl('product-edit-category').value || '').trim();
         const brand = (_getEl('product-edit-brand') && _getEl('product-edit-brand').value || '').trim();
         const supplier = (_getEl('product-edit-supplier') && _getEl('product-edit-supplier').value || '').trim();
@@ -608,26 +658,62 @@
         const stock = parseInt(_getEl('product-edit-stock') && _getEl('product-edit-stock').value || '0', 10);
         const low = parseInt(_getEl('product-edit-low') && _getEl('product-edit-low').value || '0', 10);
 
-        if (!name || !sku) { return _showToast('Product', 'Name & SKU are required.', 'error'); }
+        // Name is required, SKU is now optional
+        if (!name) { return _showToast('Product', 'Product name is required.', 'error'); }
         if (sell < buy) { _showToast('Warning', 'Selling price is below buying price.', 'error'); }
 
         const existingId = _getEl('product-edit-name') && _getEl('product-edit-name').dataset.productId;
         let product;
         if (existingId) product = db.products.find(p => p.id === existingId);
 
-        const dup = db.products.find(p => p.sku === sku && p.id !== existingId);
-        if (dup) return _showToast('Product', 'Another product already uses this SKU.', 'error');
+        // Check SKU duplication only if SKU is provided
+        if (sku) {
+            const dup = db.products.find(p => p.sku === sku && p.id !== existingId);
+            if (dup) return _showToast('Product', 'Another product already uses this SKU.', 'error');
+        }
         
-        // Check barcode duplication if provided
-        if (barcode) {
-            const barcodeDup = db.products.find(p => p.barcode === barcode && p.id !== existingId);
-            if (barcodeDup) return _showToast('Product', 'Another product already uses this barcode.', 'error');
+        // Check barcode duplication for each barcode
+        if (barcodeList.length > 0) {
+            for (const bc of barcodeList) {
+                const barcodeDup = db.products.find(p => {
+                    if (p.id === existingId) return false;
+                    const existingBarcodes = (p.barcode || '').split(',').map(b => b.trim());
+                    return existingBarcodes.includes(bc);
+                });
+                if (barcodeDup) {
+                    return _showToast('Product', `Barcode "${bc}" is already used by another product.`, 'error');
+                }
+            }
         }
 
         if (product) {
-            product.name = name; product.sku = sku; product.barcode = barcode; product.category = category; product.brand = brand; product.supplier = supplier; product.buyPrice = buy; product.sellPrice = sell; product.stock = stock; product.lowStockAt = low;
+            product.name = name; 
+            product.sku = sku; 
+            product.barcode = barcode; 
+            product.category = category; 
+            product.brand = brand; 
+            product.supplier = supplier; 
+            product.buyPrice = buy; 
+            product.sellPrice = sell; 
+            product.stock = stock; 
+            product.lowStockAt = low;
         } else {
-            product = { id: 'p' + (db.products.length + 1), name, sku, barcode, category, brand, supplier, buyPrice: buy, sellPrice: sell, stock, lowStockAt: low, createdAt: new Date().toISOString() };
+            // Generate unique ID
+            const nextId = db.products.length > 0 ? Math.max(...db.products.map(p => parseInt(p.id.replace('p', '')) || 0)) + 1 : 1;
+            product = { 
+                id: 'p' + nextId, 
+                name, 
+                sku, 
+                barcode, 
+                category, 
+                brand, 
+                supplier, 
+                buyPrice: buy, 
+                sellPrice: sell, 
+                stock, 
+                lowStockAt: low, 
+                createdAt: new Date().toISOString() 
+            };
             db.products.push(product);
         }
 
@@ -672,7 +758,142 @@
         focusProductSearch,
         updateCategorySuggestions,
         updateBrandSuggestions,
-        updateSupplierSuggestions
+        updateSupplierSuggestions,
+        initBarcodeTagInput,
+        addBarcodeTag,
+        removeBarcodeTag,
+        getBarcodes,
+        setBarcodes
     };
 
+    // ===== Barcode Tag Input =====
+    let barcodes = [];
+
+    function initBarcodeTagInput() {
+        const container = _getById('barcode-tag-container');
+        const input = _getEl('product-edit-barcode');
+        if (!container || !input) return;
+
+        // Click on container focuses the input
+        container.addEventListener('click', (e) => {
+            if (e.target === container) {
+                input.focus();
+            }
+        });
+
+        // Handle input events
+        input.addEventListener('keydown', (e) => {
+            const value = input.value.trim();
+            
+            // Space, Comma, or Enter adds the barcode
+            if (e.key === ' ' || e.key === ',' || e.key === 'Enter') {
+                e.preventDefault();
+                if (value) {
+                    addBarcodeTag(value);
+                    input.value = '';
+                }
+            }
+            
+            // Backspace on empty input removes last tag
+            else if (e.key === 'Backspace' && !input.value) {
+                e.preventDefault();
+                if (barcodes.length > 0) {
+                    removeBarcodeTag(barcodes.length - 1);
+                }
+            }
+        });
+
+        // Also handle blur to add pending barcode
+        input.addEventListener('blur', () => {
+            const value = input.value.trim();
+            if (value) {
+                addBarcodeTag(value);
+                input.value = '';
+            }
+        });
+    }
+
+    function addBarcodeTag(barcode) {
+        barcode = barcode.trim();
+        if (!barcode) return;
+        
+        // Check for duplicates
+        if (barcodes.includes(barcode)) {
+            _showToast('Duplicate', 'This barcode is already added.', 'warning');
+            return;
+        }
+
+        barcodes.push(barcode);
+        renderBarcodeTags();
+        updateBarcodeHiddenField();
+    }
+
+    function removeBarcodeTag(index) {
+        if (index >= 0 && index < barcodes.length) {
+            barcodes.splice(index, 1);
+            renderBarcodeTags();
+            updateBarcodeHiddenField();
+        }
+    }
+
+    function renderBarcodeTags() {
+        const container = _getById('barcode-tag-container');
+        const input = _getEl('product-edit-barcode');
+        if (!container || !input) return;
+
+        // Remove all existing tags
+        const existingTags = container.querySelectorAll('.barcode-tag');
+        existingTags.forEach(tag => tag.remove());
+
+        // Add tags before the input
+        barcodes.forEach((barcode, index) => {
+            const tag = document.createElement('div');
+            tag.className = 'barcode-tag';
+            
+            const text = document.createElement('span');
+            text.className = 'barcode-tag-text';
+            text.textContent = barcode;
+            text.title = barcode; // Show full barcode on hover
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'barcode-tag-remove';
+            removeBtn.innerHTML = '<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M6 18L18 6M6 6l12 12\"/></svg>';
+            removeBtn.title = 'Remove barcode';
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeBarcodeTag(index);
+            });
+            
+            tag.appendChild(text);
+            tag.appendChild(removeBtn);
+            container.insertBefore(tag, input);
+        });
+    }
+
+    function updateBarcodeHiddenField() {
+        const hidden = _getEl('product-edit-barcode-hidden');
+        if (hidden) {
+            hidden.value = barcodes.join(',');
+        }
+    }
+
+    function getBarcodes() {
+        return barcodes.slice(); // Return copy
+    }
+
+    function setBarcodes(barcodeArray) {
+        barcodes = Array.isArray(barcodeArray) ? barcodeArray.filter(b => b.trim()) : [];
+        renderBarcodeTags();
+        updateBarcodeHiddenField();
+    }
+
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initBarcodeTagInput);
+    } else {
+        initBarcodeTagInput();
+    }
+
 })();
+

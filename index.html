@@ -8,6 +8,21 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<!-- Splash Screen -->
+<div id="splash-screen" class="splash-screen">
+    <div class="splash-content">
+        <div class="splash-logo-container">
+            <img id="splash-logo-img" class="splash-logo-img" style="display: none;">
+            <div id="splash-logo-text" class="splash-logo-text">৳</div>
+        </div>
+        <div class="splash-shop-name" id="splash-shop-name">LitePOS</div>
+    </div>
+    <div class="splash-footer">
+        <div class="splash-product-name">LitePOS — Bangla Point of Sale</div>
+        <div class="splash-version">Version 1.0.0</div>
+    </div>
+</div>
+
 <div id="app" class="app-shell">
     <!-- APP HEADER -->
     <header class="app-header">
@@ -176,7 +191,7 @@
                             <div class="product-overlay-inner">
                                 <table>
                                     <thead>
-                                        <tr><th>Product</th><th>SKU</th><th>Barcode</th><th>Category</th><th>Sell</th><th>Stock</th><th></th></tr>
+                                        <tr><th>Product</th><th>SKU</th><th style="width: 120px;">Barcode</th><th>Category</th><th>Sell</th><th>Stock</th><th></th></tr>
                                     </thead>
                                     <tbody id="product-overlay-body"></tbody>
                                 </table>
@@ -692,14 +707,14 @@
                                         <th style="width: 60px;">ID</th>
                                         <th style="width: 18%;">Name</th>
                                         <th>SKU</th>
-                                        <th>Barcode</th>
+                                        <th style="width: 120px;">Barcode</th>
                                         <th>Category</th>
                                         <th>Brand</th>
                                         <th>Supplier</th>
                                         <th>Buy (৳)</th>
                                         <th>Sell (৳)</th>
                                         <th>Stock</th>
-                                        <th>Low?</th>
+                                        <!-- <th>Low?</th> -->
                                     </tr>
                                     </thead>
                                     <tbody id="products-table-body">
@@ -722,40 +737,46 @@
                                         <span class="subheader-bn">· পণ্য যোগ/সম্পাদনা</span>
                                     </h2>
                                     <p class="card-sub">
-                                        Tap a product row to load. Use SKU as unique identifier.
+                                        Tap a product row to load.
                                     </p>
                                 </div>
                             </div>
                             <div class="card-body stack-gap">
+                                <div class="field">
+                                    <label class="field-label">Product Name</label>
+                                    <input id="product-edit-name" type="text" class="field-input" autocomplete="off">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Barcode(s) <span style="font-weight: 400; font-size: 12px; color: var(--text-soft);">(Press Space or Comma to add)</span></label>
+                                    <div id="barcode-tag-container" class="field-input barcode-tag-container">
+                                        <!-- Barcode tags will be added here dynamically -->
+                                        <input id="product-edit-barcode" type="text" class="barcode-tag-input" autocomplete="off" placeholder="Scan or type barcode...">
+                                    </div>
+                                    <input id="product-edit-barcode-hidden" type="hidden">
+                                </div>
                                 <div class="two-col">
                                     <div class="field">
-                                        <label class="field-label">Name</label>
-                                        <input id="product-edit-name" type="text" class="field-input" autocomplete="off">
-                                    </div>
-                                    <div class="field">
-                                        <label class="field-label">SKU</label>
+                                        <label class="field-label">SKU <span style="font-weight: 400; font-size: 12px; color: var(--text-soft);">(optional)</span></label>
                                         <input id="product-edit-sku" type="text" class="field-input" autocomplete="off">
                                     </div>
                                     <div class="field">
-                                        <label class="field-label">Barcode (optional)</label>
-                                        <input id="product-edit-barcode" type="text" class="field-input" autocomplete="off" placeholder="Scan or enter barcode">
-                                    </div>
-                                    <div class="field">
-                                        <label class="field-label">Category (optional)</label>
-                                        <input id="product-edit-category" type="text" class="field-input" autocomplete="off" placeholder="e.g., Electronics, Food, etc." list="category-suggestions">
+                                        <label class="field-label">Category</label>
+                                        <input id="product-edit-category" type="text" class="field-input" autocomplete="off" placeholder="e.g., Electronics, Food" list="category-suggestions">
                                         <datalist id="category-suggestions">
                                             <!-- Filled by JS -->
                                         </datalist>
                                     </div>
+                                </div>
+                                <div class="two-col">
                                     <div class="field">
-                                        <label class="field-label">Brand (optional)</label>
+                                        <label class="field-label">Brand</label>
                                         <input id="product-edit-brand" type="text" class="field-input" autocomplete="off" placeholder="e.g., Samsung, Nike" list="brand-suggestions">
                                         <datalist id="brand-suggestions">
                                             <!-- Filled by JS -->
                                         </datalist>
                                     </div>
                                     <div class="field">
-                                        <label class="field-label">Supplier (optional)</label>
+                                        <label class="field-label">Supplier</label>
                                         <input id="product-edit-supplier" type="text" class="field-input" autocomplete="off" placeholder="e.g., ABC Traders" list="supplier-suggestions">
                                         <datalist id="supplier-suggestions">
                                             <!-- Filled by JS -->
@@ -902,6 +923,20 @@
                 <div class="card-body stack-gap">
                     <div class="filter-row wrap">
                         <div class="field small-field">
+                            <label class="field-label">Date Range</label>
+                            <select id="sales-filter-date-range" class="field-input field-input-sm">
+                                <option value="custom">Custom</option>
+                                <option value="today">Today</option>
+                                <option value="last7days">Last 7 days</option>
+                                <option value="last30days">Last 30 days</option>
+                                <option value="thismonth">This month</option>
+                                <option value="last3months">Last 3 months</option>
+                                <option value="last6months">Last 6 months</option>
+                                <option value="thisyear">This year</option>
+                                <option value="alltime">All time</option>
+                            </select>
+                        </div>
+                        <div class="field small-field">
                             <label class="field-label">From date</label>
                             <input id="sales-filter-from" type="date" class="field-input field-input-sm">
                         </div>
@@ -937,14 +972,14 @@
                             <thead>
                             <tr>
                                 <th style="width: 80px;">Sale ID</th>
-                                <th style="width: 8%;">Time</th>
-                                <th style="width: 12%;">Customer</th>
-                                <th style="width: 8%;">Phone</th>
-                                <th style="width: 8%;">Salesperson</th>
-                                <th style="width: 8%;">Status</th>
+                                <th style="width: 10%;">Time</th>
+                                <th style="width: 16%;">Customer</th>
+                                <th style="width: 12%;">Phone</th>
+                                <th style="width: 12%;">Salesperson</th>
+                                <th style="width: 10%;">Status</th>
                                 <th style="width: 8%;">Items</th>
-                                <th style="width: 8%;">Total (৳)</th>
-                                <th style="width: 8%;">Profit (৳)</th>
+                                <th style="width: 10%;">Total (৳)</th>
+                                <th style="width: 10%;">Profit (৳)</th>
                                 <th style="width: 150px;">Actions</th>
                             </tr>
                             </thead>
@@ -1119,6 +1154,37 @@
                                 <input id="global-currency-symbol" type="text" class="field-input" value="৳" maxlength="3" autocomplete="off">
                             </div>
                             <div class="field">
+                                <label class="field-label">Timezone</label>
+                                <select id="global-timezone" class="field-input">
+                                    <option value="-12">UTC-12:00</option>
+                                    <option value="-11">UTC-11:00</option>
+                                    <option value="-10">UTC-10:00</option>
+                                    <option value="-9">UTC-09:00</option>
+                                    <option value="-8">UTC-08:00</option>
+                                    <option value="-7">UTC-07:00</option>
+                                    <option value="-6">UTC-06:00</option>
+                                    <option value="-5">UTC-05:00</option>
+                                    <option value="-4">UTC-04:00</option>
+                                    <option value="-3">UTC-03:00</option>
+                                    <option value="-2">UTC-02:00</option>
+                                    <option value="-1">UTC-01:00</option>
+                                    <option value="0">UTC+00:00</option>
+                                    <option value="1">UTC+01:00</option>
+                                    <option value="2">UTC+02:00</option>
+                                    <option value="3">UTC+03:00</option>
+                                    <option value="4">UTC+04:00</option>
+                                    <option value="5">UTC+05:00</option>
+                                    <option value="5.5">UTC+05:30 (India)</option>
+                                    <option value="6">UTC+06:00 (Bangladesh)</option>
+                                    <option value="7">UTC+07:00</option>
+                                    <option value="8">UTC+08:00</option>
+                                    <option value="9">UTC+09:00</option>
+                                    <option value="10">UTC+10:00</option>
+                                    <option value="11">UTC+11:00</option>
+                                    <option value="12">UTC+12:00</option>
+                                </select>
+                            </div>
+                            <div class="field">
                                 <label class="field-label">Default Print Size</label>
                                 <select id="global-print-size" class="field-input">
                                     <option value="a4">A4 (210mm × 297mm)</option>
@@ -1224,16 +1290,29 @@
                     <div class="card-body stack-gap">
                         <div class="input-row">
                             <button id="btn-backup-download" class="btn btn-primary btn-xl" type="button">
-                                ⬇ Download backup (JSON)
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3" />
+                                </svg>
+                                Download backup (JSON)
+                            </button>
+                            <button id="btn-backup-download-encrypted" class="btn btn-accent-alt btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                </svg>
+                                Download encrypted backup
                             </button>
                             <label class="btn btn-ghost btn-xl file-label">
-                                ⬆ Restore from file
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18" />
+                                </svg>
+                                Restore from file
                                 <input id="backup-file-input" type="file" accept=".json" hidden>
                             </label>
                         </div>
                         <p class="hint-text">
-                            Backup includes: users, products, customers, sales, and shop settings. Restoring will replace
-                            current local data.
+                            <strong>Encrypted backup:</strong> Password-protected using AES-256-GCM encryption. Keep your password safe - it cannot be recovered!<br>
+                            <strong>Regular backup:</strong> Plain JSON format (not password protected).<br>
+                            Backup includes: users, products, customers, sales, and shop settings. Restoring will replace current local data.
                         </p>
                     </div>
                 </div>

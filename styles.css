@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+
 :root {
     --bg: #020617;
     --bg-card: #020617;
@@ -22,7 +24,7 @@
     --glass-border: rgba(63, 76, 95, 0.121);
     --glass-border-top: rgba(94, 107, 126, 0.136);
     --focus-ring: 0 0 0 1px rgba(148, 163, 184, 0.4), 0 0 0 2px rgba(34, 197, 94, 0.7);
-    --font-main: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    --font-main: 'Hanken Grotesk', 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 }
 
 /* Global reset-ish */
@@ -46,6 +48,100 @@ body {
     background: radial-gradient(circle at top left, #0f172a, #0e142e 55%, #10101a 80%);
     font-family: var(--font-main);
     -webkit-font-smoothing: antialiased;
+}
+
+/* Splash Screen */
+.splash-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at top left, #0f172a, #0e142e 55%, #10101a 80%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 1;
+    transition: opacity 0.5s ease-out;
+}
+
+.splash-screen.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.splash-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.splash-logo-container {
+    width: 120px;
+    height: 120px;
+    border-radius: 30px;
+    background: radial-gradient(circle at top left, rgba(34, 197, 94, 1), rgba(5, 150, 105, 1));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.6), 0 0px 60px rgba(34, 197, 94, 0.8);
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.6), 0 0px 60px rgba(34, 197, 94, 0.8);
+    }
+    50% {
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.8), 0 0px 80px rgba(34, 197, 94, 1);
+    }
+}
+
+.splash-logo-img {
+    width: auto;
+    height: 100px;
+    border-radius: 24px;
+}
+
+.splash-logo-text {
+    color: #022c22;
+    font-weight: 800;
+    font-size: 72px;
+    line-height: 1;
+}
+
+.splash-shop-name {
+    color: var(--text);
+    font-size: 32px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: -0.5px;
+}
+
+.splash-footer {
+    position: fixed;
+    bottom: 40px;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.splash-product-name {
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.splash-version {
+    color: var(--text-soft);
+    font-size: 12px;
+    font-weight: 400;
 }
 
 /* App shell */
@@ -176,7 +272,7 @@ body {
 /* Cards & layout */
 
 .card {
-    background: radial-gradient(circle at top left, rgba(74, 115, 173, 0.08), rgba(23, 32, 53, 0.96));
+    background: radial-gradient(circle at top left, rgba(29, 24, 63, 0.2), rgba(23, 32, 53, 0.96));
     border-radius: var(--radius-lg);
     border: 1px solid var(--glass-border);
     border-top: 2px solid var(--glass-border-top);
@@ -855,6 +951,14 @@ td {
     border-bottom: 1px solid rgba(31, 41, 55, 1);
 }
 
+/* Barcode cell with ellipsis */
+.barcode-cell {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 th {
     font-weight: 600;
     font-size: 13px;
@@ -905,7 +1009,8 @@ tbody tr:hover {
 }
 
 tbody tr.low-stock-row {
-    background: radial-gradient(circle at top left, rgba(234, 179, 8, 0.16), rgba(15, 23, 42, 0.98));
+    color: #f69994;
+    background: radial-gradient(circle at top left, rgba(168, 127, 6, 0.101), rgba(15, 23, 42, 0.98));
 }
 
 /* Open sales strip */
@@ -1036,23 +1141,27 @@ tbody tr.low-stock-row {
 }
 
 /* Sales date group styling */
-.sales-date-group {
-    margin-bottom: 20px;
-    border-radius: var(--radius-md);
-    border: 1px solid rgba(34, 197, 94, 0.2);
-    background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.6), rgba(2, 6, 23, 0.8));
-    overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+/* Sales table header rows - replaces .sales-date-group container */
+.sales-date-header-row {
+    background: transparent;
+}
+
+.sales-date-header-row td {
+    padding: 0 !important;
+    border: none !important;
 }
 
 .sales-date-header {
     background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.1));
-    border-bottom: 2px solid rgba(34, 197, 94, 0.3);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: var(--radius-md);
     padding: 16px 20px;
+    margin-bottom: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 24px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .sales-date-header .date-title {
@@ -1110,25 +1219,41 @@ tbody tr.low-stock-row {
     color: #22c55e;
 }
 
-.sales-date-group table {
-    background: transparent;
-}
-
-.sales-date-group tbody tr {
+/* Sales data rows */
+.sales-data-row {
     transition: background-color 0.15s ease;
-}
-
-.sales-date-group tbody tr:hover {
-    background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.08), rgba(15, 23, 42, 0.6));
-}
-
-.sales-date-group tbody td {
-    padding: 12px 16px;
-    font-size: 13px;
     border-bottom: 1px solid rgba(31, 41, 55, 0.5);
 }
 
-.sales-date-group tbody tr:last-child td {
+.sales-data-row.sale-closed {
+    color: #c8f7cb;
+}
+
+.sales-data-row.sale-open {
+    color: #e0ca88;
+}
+
+.sales-data-row:hover {
+    background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.08), rgba(15, 23, 42, 0.6));
+}
+
+.sales-data-row td {
+    padding: 12px 16px;
+    font-size: 13px;
+}
+
+/* Add spacing between date groups */
+.sales-date-header-row + .sales-data-row {
+    border-top: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+/* Last row in a group */
+.sales-data-row:has(+ .sales-date-header-row) {
+    border-bottom: 2px solid rgba(31, 41, 55, 0.8);
+}
+
+/* Very last row */
+.sales-data-row:last-child {
     border-bottom: none;
 }
 
@@ -1972,3 +2097,79 @@ body.receipt-58mm.print-receipt {
         width: 100%;
     }    
 }
+
+/* Barcode Tag Input Styles */
+.barcode-tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;   
+    align-items: center;
+    cursor: text;
+}
+
+.barcode-tag-container:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+.barcode-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.15));
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+.barcode-tag-text {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.barcode-tag-remove {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    color: var(--danger);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    transition: background-color 0.15s ease;
+}
+
+.barcode-tag-remove:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.barcode-tag-remove svg {
+    width: 12px;
+    height: 12px;
+}
+
+.barcode-tag-input {
+    flex: 1;
+    min-width: 120px;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    padding: 4px 0;
+}
+
+.barcode-tag-input::placeholder {
+    color: var(--text-soft);
+}
+

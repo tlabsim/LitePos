@@ -173,11 +173,15 @@
         
         // Get elements directly
         const currencyInput = document.getElementById('global-currency-symbol');
+        const timezoneInput = document.getElementById('global-timezone');
         const printSizeInput = document.getElementById('global-print-size');
         const printTemplateInput = document.getElementById('global-print-template');
         
         if (currencyInput) {
             currencyInput.value = settings.currency || '৳';
+        }
+        if (timezoneInput) {
+            timezoneInput.value = String(settings.timezone !== undefined ? settings.timezone : 0);
         }
         if (printSizeInput) {
             printSizeInput.value = settings.defaultPrintSize || 'a4';
@@ -216,14 +220,17 @@
         
         // Get elements directly, not from cache
         const currencyInput = document.getElementById('global-currency-symbol');
+        const timezoneInput = document.getElementById('global-timezone');
         const printSizeInput = document.getElementById('global-print-size');
         const printTemplateInput = document.getElementById('global-print-template');
         
         console.log('[admin.js] Currency input:', currencyInput, 'value:', currencyInput?.value);
+        console.log('[admin.js] Timezone input:', timezoneInput, 'value:', timezoneInput?.value);
         console.log('[admin.js] Print size input:', printSizeInput, 'value:', printSizeInput?.value);
         console.log('[admin.js] Print template input:', printTemplateInput, 'value:', printTemplateInput?.value);
         
         db.settings.currency = (currencyInput && currencyInput.value.trim()) || '৳';
+        db.settings.timezone = (timezoneInput && parseFloat(timezoneInput.value)) || 0;
         db.settings.defaultPrintSize = (printSizeInput && printSizeInput.value) || 'a4';
         db.settings.defaultPrintTemplate = (printTemplateInput && printTemplateInput.value) || 'standard';
         
@@ -338,31 +345,205 @@
         showToast('User saved', `${user.name}`, 'success');
     }
 
-    function downloadBackup() {
+    // -------------------------
+    // BACKUP ENCRYPTION UTILITIES
+    // -------------------------
+    
+    /**
+     * Derive encryption key from password using PBKDF2
+     * @param {string} password - User password
+     * @param {Uint8Array} salt - Random salt
+     * @returns {Promise<CryptoKey>} Derived key
+     */
+    async function deriveKey(password, salt) {
+        const encoder = new TextEncoder();
+        const passwordBuffer = encoder.encode(password);
+        
+        const baseKey = await crypto.subtle.importKey(
+            'raw',
+            passwordBuffer,
+            'PBKDF2',
+            false,
+            ['deriveKey']
+        );
+        
+        return crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: salt,
+                iterations: 100000, // OWASP recommendation
+                hash: 'SHA-256'
+            },
+            baseKey,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    }
+    
+    /**
+     * Encrypt data using AES-256-GCM
+     * @param {string} plaintext - Data to encrypt
+     * @param {string} password - Encryption password
+     * @returns {Promise<string>} Base64 encoded encrypted data with salt and IV
+     */
+    async function encryptData(plaintext, password) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(plaintext);
+        
+        // Generate random salt and IV
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        
+        // Derive key from password
+        const key = await deriveKey(password, salt);
+        
+        // Encrypt data
+        const encrypted = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            data
+        );
+        
+        // Combine salt + iv + encrypted data
+        const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+        combined.set(salt, 0);
+        combined.set(iv, salt.length);
+        combined.set(new Uint8Array(encrypted), salt.length + iv.length);
+        
+        // Convert to base64
+        return btoa(String.fromCharCode.apply(null, combined));
+    }
+    
+    /**
+     * Decrypt data using AES-256-GCM
+     * @param {string} encryptedBase64 - Base64 encoded encrypted data
+     * @param {string} password - Decryption password
+     * @returns {Promise<string>} Decrypted plaintext
+     */
+    async function decryptData(encryptedBase64, password) {
+        // Decode base64
+        const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+        
+        // Extract salt, IV, and encrypted data
+        const salt = combined.slice(0, 16);
+        const iv = combined.slice(16, 28);
+        const encrypted = combined.slice(28);
+        
+        // Derive key from password
+        const key = await deriveKey(password, salt);
+        
+        // Decrypt data
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            encrypted
+        );
+        
+        // Convert to string
+        const decoder = new TextDecoder();
+        return decoder.decode(decrypted);
+    }
+
+    async function downloadBackup(password) {
         const state = getState();
         const db = state.db || {};
         const backup = { exportedAt: new Date().toISOString(), db };
-        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        
+        let content;
+        let filename;
+        
+        // Format: litepos-backup-YYYYMMDD-HHMMSS
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0,10).replace(/-/g,'');
+        const timeStr = now.toISOString().slice(11,19).replace(/:/g,'');
+        
+        if (password) {
+            // Encrypt backup
+            try {
+                const plaintext = JSON.stringify(backup, null, 2);
+                const encrypted = await encryptData(plaintext, password);
+                
+                // Create encrypted backup structure
+                const encryptedBackup = {
+                    encrypted: true,
+                    version: '1.0.0',
+                    data: encrypted
+                };
+                
+                content = JSON.stringify(encryptedBackup, null, 2);
+                filename = `litepos-backup-${dateStr}-${timeStr}-encrypted.json`;
+                
+                // Update last backup date
+                db.settings = db.settings || {};
+                db.settings.lastBackupDate = now.toISOString();
+                saveDb(db);
+                
+                showToast('Encrypted Backup', 'Password-protected backup downloaded. Keep your password safe!', 'success');
+            } catch (err) {
+                console.error('Encryption failed:', err);
+                showToast('Encryption Failed', 'Could not encrypt backup. ' + err.message, 'error');
+                return;
+            }
+        } else {
+            // Plain text backup
+            content = JSON.stringify(backup, null, 2);
+            filename = `litepos-backup-${dateStr}-${timeStr}.json`;
+            
+            // Update last backup date
+            db.settings = db.settings || {};
+            db.settings.lastBackupDate = now.toISOString();
+            saveDb(db);
+            
+            showToast('Backup', 'Backup JSON downloaded.', 'success');
+        }
+        
+        const blob = new Blob([content], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        const todayStr = (new Date()).toISOString().slice(0,10).replace(/-/g,'');
         a.href = url;
-        a.download = `litepos-backup-${todayStr}.json`;
+        a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
-        showToast('Backup', 'Backup JSON downloaded.', 'success');
     }
 
-    function handleRestoreFile(ev) {
+    async function handleRestoreFile(ev) {
         const file = ev.target.files && ev.target.files[0];
         if (!file) return;
         if (!confirm('Restoring backup will replace all local data. Continue?')) { ev.target.value = ''; return; }
+        
         const reader = new FileReader();
-        reader.onload = () => {
+        reader.onload = async () => {
             try {
                 const parsed = JSON.parse(reader.result);
-                const nextDb = parsed.db || parsed;
+                let nextDb;
+                
+                // Check if backup is encrypted
+                if (parsed.encrypted) {
+                    const password = prompt('This backup is encrypted. Enter password:');
+                    if (!password) {
+                        showToast('Restore cancelled', 'Password required for encrypted backup.', 'error');
+                        ev.target.value = '';
+                        return;
+                    }
+                    
+                    try {
+                        const decrypted = await decryptData(parsed.data, password);
+                        const decryptedBackup = JSON.parse(decrypted);
+                        nextDb = decryptedBackup.db || decryptedBackup;
+                    } catch (err) {
+                        console.error('Decryption failed:', err);
+                        showToast('Restore failed', 'Incorrect password or corrupted backup.', 'error');
+                        ev.target.value = '';
+                        return;
+                    }
+                } else {
+                    // Plain text backup
+                    nextDb = parsed.db || parsed;
+                }
+                
                 if (!nextDb || !nextDb.shop || !nextDb.users) throw new Error('Invalid backup structure.');
+                
                 localStorage.setItem(KEY, JSON.stringify(nextDb));
                 if (window.LitePos && window.LitePos.api && typeof window.LitePos.api.saveDb === 'function') {
                     try { window.LitePos.api.saveDb(nextDb); } catch (e) { /* ignore */ }

@@ -37,16 +37,94 @@
 
     function prepareSalesFiltersIfEmpty() {
         const els = _getEls();
-        const today = new Date();
+        // Get current date in local timezone
+        const today = UTILS && typeof UTILS.now === 'function' ? UTILS.now() : new Date();
         if (!_getEl('sales-filter-from') || !_getEl('sales-filter-to')) return;
+
         if (!_getEl('sales-filter-from').value) {
-            const weekAgo = new Date(today.getTime() - 6 * 86400000);
-            _getEl('sales-filter-from').value = (UTILS && typeof UTILS.toDateInput === 'function') ? UTILS.toDateInput(weekAgo) : toDateInput(weekAgo);
+            const weekAgo = new Date(today);
+            weekAgo.setDate(today.getDate() - 7);
+            const formatForInput = UTILS && typeof UTILS.toDateInputLocal === 'function' 
+                ? UTILS.toDateInputLocal 
+                : (d => d.toISOString().split('T')[0]);
+            _getEl('sales-filter-from').value = formatForInput(weekAgo);
         }
         if (!_getEl('sales-filter-to').value) {
-            _getEl('sales-filter-to').value = (UTILS && typeof UTILS.toDateInput === 'function') ? UTILS.toDateInput(today) : toDateInput(today);
+            const formatForInput = UTILS && typeof UTILS.toDateInputLocal === 'function' 
+                ? UTILS.toDateInputLocal 
+                : (d => d.toISOString().split('T')[0]);
+            _getEl('sales-filter-to').value = formatForInput(today);
         }
-        populateSalespersonFilter();
+    }
+
+    function applyDateRange(range) {
+        // Get current date in local timezone
+        const today = UTILS && typeof UTILS.now === 'function' ? UTILS.now() : new Date();
+        let fromDate, toDate;
+
+        switch (range) {
+            case 'today':
+                fromDate = toDate = new Date(today);
+                break;
+            case 'last7days':
+                fromDate = new Date(today);
+                fromDate.setDate(today.getDate() - 6);
+                toDate = new Date(today);
+                break;
+            case 'last30days':
+                fromDate = new Date(today);
+                fromDate.setDate(today.getDate() - 29);
+                toDate = new Date(today);
+                break;
+            case 'thismonth':
+                fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                toDate = new Date(today);
+                break;
+            case 'last3months':
+                fromDate = new Date(today);
+                fromDate.setMonth(today.getMonth() - 3);
+                toDate = new Date(today);
+                break;
+            case 'last6months':
+                fromDate = new Date(today);
+                fromDate.setMonth(today.getMonth() - 6);
+                toDate = new Date(today);
+                break;
+            case 'thisyear':
+                fromDate = new Date(today.getFullYear(), 0, 1);
+                toDate = new Date(today);
+                break;
+            case 'alltime':
+                // Get all sales from the database
+                const db = _getDb();
+                const allSales = (db.sales || []);
+                if (allSales.length > 0) {
+                    // Find earliest and latest sale dates
+                    const dates = allSales.map(s => new Date(s.createdAt));
+                    const earliest = new Date(Math.min(...dates));
+                    const latest = new Date(Math.max(...dates));
+                    fromDate = earliest;
+                    toDate = latest;
+                } else {
+                    // No sales, default to today
+                    fromDate = toDate = new Date(today);
+                }
+                break;
+            case 'custom':
+            default:
+                return; // Don't change the dates for custom
+        }
+
+        if (fromDate && toDate) {
+            // Use timezone-aware date formatting
+            const formatForInput = UTILS && typeof UTILS.toDateInputLocal === 'function' 
+                ? UTILS.toDateInputLocal 
+                : (d => d.toISOString().split('T')[0]);
+            
+            _getEl('sales-filter-from').value = formatForInput(fromDate);
+            _getEl('sales-filter-to').value = formatForInput(toDate);
+            renderSalesTable();
+        }
     }
 
     function populateSalespersonFilter() {
@@ -78,7 +156,50 @@
         if (_getEl('sales-filter-status')) _getEl('sales-filter-status').value = 'all';
         if (_getEl('sales-filter-user')) _getEl('sales-filter-user').value = 'all';
         if (_getEl('sales-filter-query')) _getEl('sales-filter-query').value = '';
+        if (_getEl('sales-filter-date-range')) _getEl('sales-filter-date-range').value = 'custom';
         if (typeof window.renderSalesTable === 'function') window.renderSalesTable();
+    }
+
+    function printReceiptForSale(saleId) {
+        const db = _getDb();
+        const sale = (db.sales || []).find(s => s.id === saleId);
+        if (!sale) {
+            _showToast('Print', 'Sale not found.', 'error');
+            return;
+        }
+
+        // Use pos module's fillReceiptFromSale if available
+        if (window.LitePos?.pos?.fillReceiptFromSale) {
+            window.LitePos.pos.fillReceiptFromSale(sale);
+        }
+
+        // Get global settings for template and size
+        const settings = db.settings || {};
+        const template = settings.defaultPrintTemplate || 'standard';
+        const size = settings.defaultPrintSize || 'a4';
+
+        // Show/hide templates
+        const standardTemplate = document.getElementById('receipt-standard');
+        const compactTemplate = document.getElementById('receipt-compact');
+        if (standardTemplate) standardTemplate.style.display = (template === 'standard') ? 'block' : 'none';
+        if (compactTemplate) compactTemplate.style.display = (template === 'compact') ? 'block' : 'none';
+
+        // Add print classes
+        document.body.classList.add('print-receipt');
+        document.body.classList.add(
+            size === '80mm' ? 'receipt-80mm' :
+            size === '58mm' ? 'receipt-58mm' : 'receipt-a4'
+        );
+
+        // Print
+        setTimeout(() => {
+            window.print();
+        }, 200);
+
+        // Cleanup after print
+        setTimeout(() => {
+            document.body.classList.remove('print-receipt', 'receipt-a4', 'receipt-80mm', 'receipt-58mm');
+        }, 1000);
     }
 
     function deleteSaleWithConfirmation(saleId) {
@@ -157,8 +278,17 @@
             .slice()
             .filter(sale => {
                 if (from || to) {
-                    const d = new Date(sale.createdAt || sale.updatedAt || new Date());
-                    const dStr = (UTILS && typeof UTILS.toDateInput === 'function') ? UTILS.toDateInput(d) : toDateInput(d);
+                    // Sale dates are stored in UTC, convert to local timezone for comparison
+                    const saleDate = new Date(sale.createdAt || sale.updatedAt || new Date());
+                    const localDate = UTILS && typeof UTILS.utcToLocal === 'function' 
+                        ? UTILS.utcToLocal(saleDate) 
+                        : saleDate;
+                    
+                    const formatForCompare = UTILS && typeof UTILS.toDateInputLocal === 'function'
+                        ? UTILS.toDateInputLocal
+                        : (d => d.toISOString().split('T')[0]);
+                    
+                    const dStr = formatForCompare(localDate);
                     if (from && dStr < from) return false;
                     if (to && dStr > to) return false;
                 }
@@ -185,8 +315,12 @@
         // Group sales by date
         const groupsByDate = {};
         filteredSales.forEach(sale => {
-            const d = new Date(sale.createdAt || sale.updatedAt || new Date());
-            const dateKey = d.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+            const saleDate = new Date(sale.createdAt || sale.updatedAt || new Date());
+            // Convert UTC to local timezone for grouping
+            const localDate = UTILS && typeof UTILS.utcToLocal === 'function' 
+                ? UTILS.utcToLocal(saleDate) 
+                : saleDate;
+            const dateKey = localDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format in local timezone
             
             if (!groupsByDate[dateKey]) {
                 groupsByDate[dateKey] = {
@@ -248,106 +382,106 @@
             summaryContainer.appendChild(globalSummaryDiv);
         }
 
-        // Render grouped table with containers
+        // Render grouped sales with date headers as special rows
         sortedDates.forEach(dateKey => {
-      const group = groupsByDate[dateKey];
-      const dateDisplay = new Date(dateKey + 'T00:00:00').toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      });
+            const group = groupsByDate[dateKey];
+            const dateDisplay = new Date(dateKey + 'T00:00:00').toLocaleDateString('en-US', { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+            });
 
-      // Create date group container
-      const groupContainer = document.createElement('div');
-      groupContainer.className = 'sales-date-group';
+            // Create date header row
+            const headerRow = document.createElement('tr');
+            headerRow.className = 'sales-date-header-row';
+            const headerCell = document.createElement('td');
+            headerCell.colSpan = 10;
+            headerCell.innerHTML = `
+                <div class="sales-date-header">
+                    <div class="date-title">
+                        <span>📅</span>
+                        <span>${dateDisplay}</span>
+                    </div>
+                    <div class="date-stats">
+                        <div class="stat-item stat-count">
+                            <span class="stat-value">${group.count}</span>
+                            <span class="stat-label">sale${group.count !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div class="stat-item stat-total">
+                            <span class="stat-value">${(UTILS && typeof UTILS.formatMoney === 'function') ? UTILS.formatMoney(group.total) : formatMoney(group.total)}</span>
+                            <span class="stat-label">revenue</span>
+                        </div>
+                        <div class="stat-item stat-profit">
+                            <span class="stat-value">${(UTILS && typeof UTILS.formatMoney === 'function') ? UTILS.formatMoney(group.profit) : formatMoney(group.profit)}</span>
+                            <span class="stat-label">profit</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            headerRow.appendChild(headerCell);
+            tbody.appendChild(headerRow);
 
-      // Date header with stats
-      const headerDiv = document.createElement('div');
-      headerDiv.className = 'sales-date-header';
-      headerDiv.innerHTML = `
-        <div class="date-title">
-          <span>📅</span>
-          <span>${dateDisplay}</span>
-        </div>
-        <div class="date-stats">
-          <div class="stat-item stat-count">
-            <span class="stat-value">${group.count}</span>
-            <span class="stat-label">sale${group.count !== 1 ? 's' : ''}</span>
-          </div>
-          <div class="stat-item stat-total">
-            <span class="stat-value">${(UTILS && typeof UTILS.formatMoney === 'function') ? UTILS.formatMoney(group.total) : formatMoney(group.total)}</span>
-            <span class="stat-label">revenue</span>
-          </div>
-          <div class="stat-item stat-profit">
-            <span class="stat-value">${(UTILS && typeof UTILS.formatMoney === 'function') ? UTILS.formatMoney(group.profit) : formatMoney(group.profit)}</span>
-            <span class="stat-label">profit</span>
-          </div>
-        </div>
-      `;
-      groupContainer.appendChild(headerDiv);
-
-      // Create mini table for this date's sales
-      const miniTable = document.createElement('table');
-      miniTable.innerHTML = '<tbody></tbody>';
-      const miniTbody = miniTable.querySelector('tbody');            // Individual sale rows for this date
+            // Individual sale rows for this date
             group.sales.forEach(sale => {
                 const tr = document.createElement('tr');
+                tr.classList.add('sales-data-row');
+                if (sale.status === 'closed') {
+                    tr.classList.add('sale-closed');
+                }
+                if (sale.status === 'open') {
+                    tr.classList.add('sale-open');
+                }
 
                 const tdId = document.createElement('td');
                 tdId.textContent = sale.id || '—';
-                tdId.style.width = '80px';
                 tdId.style.fontSize = '13px';
                 tdId.style.fontWeight = '600';
                 tr.appendChild(tdId);
 
                 const tdDate = document.createElement('td');
-                tdDate.style.width = '8%';
-                const d = new Date(sale.createdAt || sale.updatedAt || new Date());
-                // Show time in AM/PM format
-                tdDate.textContent = d.toLocaleTimeString('en-US', { 
-                    hour: 'numeric', 
-                    minute: '2-digit', 
-                    hour12: true 
-                });
+                const saleDate = new Date(sale.createdAt || sale.updatedAt || new Date());
+                // Format time in configured timezone
+                if (UTILS && typeof UTILS.formatTimeInTimezone === 'function') {
+                    tdDate.textContent = UTILS.formatTimeInTimezone(saleDate, { hour12: true });
+                } else {
+                    // Fallback to regular time display
+                    tdDate.textContent = saleDate.toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit', 
+                        hour12: true 
+                    });
+                }
                 tr.appendChild(tdDate);
 
                 const tdCustomer = document.createElement('td');
-                tdCustomer.style.width = '12%';
                 const customerName = sale.customer && sale.customer.name ? sale.customer.name : 'Walk-in';
                 tdCustomer.textContent = customerName;
                 tr.appendChild(tdCustomer);
 
                 const tdPhone = document.createElement('td');
-                tdPhone.style.width = '8%';
                 tdPhone.textContent = sale.customer && sale.customer.phone ? sale.customer.phone : '—';
                 tr.appendChild(tdPhone);
 
                 const tdUser = document.createElement('td');
-                tdUser.style.width = '8%';  
                 const user = (db.users || []).find(u => u.id === sale.salespersonId);
                 tdUser.textContent = user ? user.name : '—';
                 tr.appendChild(tdUser);
 
                 const tdStatus = document.createElement('td');
-                tdStatus.style.width = '8%';
                 tdStatus.textContent = sale.status;
                 tr.appendChild(tdStatus);
 
                 const itemsCount = (sale.items || []).reduce((s, it) => s + it.qty, 0);
-                
                 const tdItems = document.createElement('td');
-                tdItems.style.width = 'auto'; 
                 tdItems.textContent = String(itemsCount);
                 tr.appendChild(tdItems);
 
                 const tdTotal = document.createElement('td');
-                tdTotal.style.width = 'auto';
                 tdTotal.textContent = (UTILS && typeof UTILS.formatMoney === 'function') ? UTILS.formatMoney(sale.total || 0) : formatMoney(sale.total || 0);
                 tr.appendChild(tdTotal);
 
                 const tdProfit = document.createElement('td');
-                tdProfit.style.width = 'auto';
                 tdProfit.textContent = (UTILS && typeof UTILS.formatMoney === 'function') ? UTILS.formatMoney(computeProfitForSale(sale)) : formatMoney(computeProfitForSale(sale));
                 tr.appendChild(tdProfit);
 
@@ -376,10 +510,10 @@
                 if (sale.status === 'closed') {
                     const btnPrint = document.createElement('button');
                     btnPrint.type = 'button';
-                    btnPrint.className = 'btn btn-accent';
+                    btnPrint.className = 'btn btn-ghost';
                     btnPrint.style.padding = '4px 10px';
                     btnPrint.style.fontSize = '12px';
-                    btnPrint.innerHTML = '🖨';
+                    btnPrint.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">  <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z" /></svg>';
                     btnPrint.title = 'Print receipt';
                     btnPrint.addEventListener('click', () => {
                         printReceiptForSale(sale.id);
@@ -403,31 +537,36 @@
                     });
                     tdActions.appendChild(btnDelete);
                 }
-        tr.appendChild(tdActions);
-
-        miniTbody.appendChild(tr);
-      });
-
-      // Append mini table to group container
-      groupContainer.appendChild(miniTable);
-
-      // Wrap group container in a tr and td to fit in main table structure
-      const containerRow = document.createElement('tr');
-      const containerCell = document.createElement('td');
-      containerCell.colSpan = 10;
-      containerCell.style.padding = '0 0 20px 0';
-      containerCell.style.border = 'none';
-      containerCell.appendChild(groupContainer);
-      containerRow.appendChild(containerCell);
-      tbody.appendChild(containerRow);
-    });
-  }    // Expose API
+                
+                tr.appendChild(tdActions);
+                tbody.appendChild(tr);
+            });
+        });
+    }    // Expose API
     window.LitePos.sales = {
         prepareSalesFiltersIfEmpty,
         populateSalespersonFilter,
         clearSalesFilters,
         renderSalesTable,
-        computeProfitForSale
+        computeProfitForSale,
+        printReceiptForSale,
+        applyDateRange
     };
+
+    // Initialize date range filter when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDateRangeFilter);
+    } else {
+        initDateRangeFilter();
+    }
+
+    function initDateRangeFilter() {
+        const dateRangeSelect = _getEl('sales-filter-date-range');
+        if (dateRangeSelect) {
+            dateRangeSelect.addEventListener('change', (e) => {
+                applyDateRange(e.target.value);
+            });
+        }
+    }
 
 })();

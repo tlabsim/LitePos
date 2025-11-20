@@ -259,14 +259,28 @@
         ns.pos.renderCartTable();
     };
 
-    ns.pos.addProductToCart = function (sku) {
+    ns.pos.addProductToCart = function (sku, barcodeUsed) {
         if (!ns.state.currentSale) ns.state.currentSale = ns.pos.createEmptySale();
         const product = ns.state.db.products.find(p => p.sku === sku);
         if (!product) return;
         const existing = ns.state.currentSale.items.find(it => it.sku === sku);
         const currentQty = existing ? existing.qty : 0;
         if (currentQty + 1 > product.stock) { if (ns.ui) ns.ui.showToast('Stock limit', `Only ${product.stock} in stock.`, 'error'); return; }
-        if (existing) existing.qty += 1; else ns.state.currentSale.items.push({ sku: product.sku, name: product.name, qty: 1, price: product.sellPrice, buyPrice: product.buyPrice });
+        if (existing) {
+            existing.qty += 1;
+            // Update barcode if a different one was used
+            if (barcodeUsed && !existing.barcode) existing.barcode = barcodeUsed;
+        } else {
+            ns.state.currentSale.items.push({
+                productId: product.id,
+                sku: product.sku || null,
+                barcode: barcodeUsed || (product.barcode ? product.barcode.split(',')[0].trim() : null),
+                name: product.name,
+                qty: 1,
+                price: product.sellPrice,
+                buyPrice: product.buyPrice
+            });
+        }
         ns.pos.renderCartTable();
     };
 
@@ -565,9 +579,26 @@
         // Sale metadata
         const saleMeta = _getEl(isCompact ? 'receipt-sale-meta-compact' : 'receipt-sale-meta');
         if (saleMeta) {
-            const date = new Date(sale.createdAt || sale.updatedAt || new Date());
-            const dateStr = date.toLocaleDateString();
-            const timeStr = date.toLocaleTimeString();
+            const saleDate = new Date(sale.createdAt || sale.updatedAt || new Date());
+            
+            // Format date and time in configured timezone
+            let dateStr, timeStr;
+            if (ns.utils && typeof ns.utils.formatTimeInTimezone === 'function') {
+                // Use timezone-aware formatting
+                const localDate = ns.utils.utcToLocal(saleDate);
+                dateStr = localDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    timeZone: 'UTC' // Display using UTC since we already adjusted the time
+                });
+                timeStr = ns.utils.formatTimeInTimezone(saleDate, { hour12: true });
+            } else {
+                // Fallback to browser timezone
+                dateStr = saleDate.toLocaleDateString();
+                timeStr = saleDate.toLocaleTimeString();
+            }
+            
             const customerName = sale.customer?.name || 'Walk-in';
             const salesperson = ns.state.db.users?.find(u => u.id === sale.salespersonId);
             

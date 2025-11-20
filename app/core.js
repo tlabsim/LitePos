@@ -204,6 +204,9 @@
         } else {
             db = loadDb();
         }
+        
+        // Update splash screen with shop info
+        updateSplashWithShopInfo();
 
         // Session init: prefer ns.api.initSession
         if (ns.api && typeof ns.api.initSession === 'function') {
@@ -231,6 +234,38 @@
     } else {
         // DOM already ready — run initialization immediately
         try { initApp(); } catch (e) { console.error('initApp failed', e); }
+    }
+
+    // -------------------------
+    // SPLASH SCREEN MANAGEMENT
+    // -------------------------
+    
+    function hideSplashScreen() {
+        const splash = document.getElementById('splash-screen');
+        if (splash) {
+            splash.classList.add('fade-out');
+            // Remove from DOM after fade completes
+            setTimeout(() => {
+                splash.remove();
+            }, 500);
+        }
+    }
+
+    function updateSplashWithShopInfo() {
+        // Update splash screen with shop logo and name if available
+        const splashLogoImg = document.getElementById('splash-logo-img');
+        const splashLogoText = document.getElementById('splash-logo-text');
+        const splashShopName = document.getElementById('splash-shop-name');
+        
+        if (db && db.settings && db.settings.logoUrl && splashLogoImg) {
+            splashLogoImg.src = db.settings.logoUrl;
+            splashLogoImg.style.display = 'block';
+            if (splashLogoText) splashLogoText.style.display = 'none';
+        }
+        
+        if (db && db.shop && db.shop.name && splashShopName) {
+            splashShopName.textContent = db.shop.name;
+        }
     }
 
     // -------------------------
@@ -542,7 +577,7 @@
             'users-table-body',
             'user-edit-name', 'user-edit-username', 'user-edit-pin', 'user-edit-role',
             'btn-save-user', 'btn-new-user',
-            'btn-backup-download', 'backup-file-input',
+            'btn-backup-download', 'btn-backup-download-encrypted', 'backup-file-input',
 
             // Toast container
             'toast-container'
@@ -587,6 +622,9 @@
         if (getElement('main-screen')) getElement('main-screen').classList.add('hidden');
         if (getElement('setup-panel')) getElement('setup-panel').classList.remove('hidden');
         if (getElement('signin-panel')) getElement('signin-panel').classList.add('hidden');
+        
+        // Hide splash screen when showing setup
+        hideSplashScreen();
     }
 
     function showLoginOnly() {
@@ -595,11 +633,17 @@
         if (getElement('setup-panel')) getElement('setup-panel').classList.add('hidden');
         if (getElement('signin-panel')) getElement('signin-panel').classList.remove('hidden');
         populateLoginUserSelect();
+        
+        // Hide splash screen when showing login
+        hideSplashScreen();
     }
 
     function showMainScreen() {
         if (getElement('login-screen')) getElement('login-screen').classList.add('hidden');
         if (getElement('main-screen')) getElement('main-screen').classList.remove('hidden');
+        
+        // Hide splash screen after showing main screen
+        hideSplashScreen();
         
         // Restore last active tab or default to sale tab
         let savedTab = 'tab-sale';
@@ -771,6 +815,28 @@
 
         // Keyboard shortcuts
         window.addEventListener('keydown', handleKeyShortcuts);
+        
+        // Warn about unsaved data on page unload
+        window.addEventListener('beforeunload', (e) => {
+            const db = window.LitePos?.state?.db || {};
+            const sales = db.sales || [];
+            const lastBackup = db.settings?.lastBackupDate;
+            const now = new Date();
+            
+            // Check if there are sales and no recent backup
+            if (sales.length > 0) {
+                const daysSinceBackup = lastBackup 
+                    ? Math.floor((now - new Date(lastBackup)) / (1000 * 60 * 60 * 24))
+                    : 999;
+                
+                // Warn if no backup in last 7 days or never backed up
+                if (daysSinceBackup > 7) {
+                    e.preventDefault();
+                    e.returnValue = 'You have not created a backup recently. Your data may be lost. Are you sure you want to leave?';
+                    return e.returnValue;
+                }
+            }
+        });
 
         // POS: customer & quick add
         if (getElement('btn-search-customer')) {
@@ -1036,10 +1102,55 @@
 
         // Admin: backup/restore
         if (getElement('btn-backup-download')) {
-            getElement('btn-backup-download').addEventListener('click', downloadBackup);
+            getElement('btn-backup-download').addEventListener('click', () => {
+                if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.downloadBackup === 'function') {
+                    window.LitePos.admin.downloadBackup(); // Plain backup (no password)
+                } else {
+                    downloadBackup();
+                }
+            });
+        }
+        if (getElement('btn-backup-download-encrypted')) {
+            getElement('btn-backup-download-encrypted').addEventListener('click', () => {
+                const password = prompt('Enter a strong password to encrypt your backup:\n\n⚠️ IMPORTANT: Remember this password!\nYou will need it to restore the backup.\nIt cannot be recovered if lost.');
+                
+                if (!password) {
+                    if (window.LitePos && window.LitePos.ui && typeof window.LitePos.ui.showToast === 'function') {
+                        window.LitePos.ui.showToast('Cancelled', 'Encrypted backup cancelled.', 'error');
+                    }
+                    return;
+                }
+                
+                if (password.length < 8) {
+                    if (window.LitePos && window.LitePos.ui && typeof window.LitePos.ui.showToast === 'function') {
+                        window.LitePos.ui.showToast('Weak Password', 'Password must be at least 8 characters long.', 'error');
+                    }
+                    return;
+                }
+                
+                const confirmPassword = prompt('Confirm your password:');
+                if (password !== confirmPassword) {
+                    if (window.LitePos && window.LitePos.ui && typeof window.LitePos.ui.showToast === 'function') {
+                        window.LitePos.ui.showToast('Password Mismatch', 'Passwords do not match.', 'error');
+                    }
+                    return;
+                }
+                
+                if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.downloadBackup === 'function') {
+                    window.LitePos.admin.downloadBackup(password);
+                } else {
+                    downloadBackup(password);
+                }
+            });
         }
         if (getElement('backup-file-input')) {
-            getElement('backup-file-input').addEventListener('change', handleRestoreFile);
+            getElement('backup-file-input').addEventListener('change', (ev) => {
+                if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.handleRestoreFile === 'function') {
+                    window.LitePos.admin.handleRestoreFile(ev);
+                } else {
+                    handleRestoreFile(ev);
+                }
+            });
         }
 
         // Clean up print classes after printing
