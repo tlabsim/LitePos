@@ -346,9 +346,14 @@
 
                             <!-- Discount input -->
                             <div class="payment-row">
-                                <label class="payment-label" for="input-discount">Discount (৳) · ছাড়</label>
-                                <input id="input-discount" type="number" class="payment-input-clean"
-                                    value="0" min="0" step="1">
+                                <label class="payment-label" for="input-discount">Discount (৳) · ছাড়
+                                    <span id="discount-percentage" class="payment-value" style="font-size: 15px; color: var(--accent-alt); margin-left: 12px; min-width: 50px; text-align: right;">0%</span>
+                                </label>
+                                 
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <input id="input-discount" type="number" class="payment-input-clean"
+                                        value="0" min="0" step="1" style="flex: 1;">                                   
+                                </div>
                             </div>
 
                             <!-- Total (read-only, emphasized) -->
@@ -510,10 +515,12 @@
                             <table>
                                 <thead>
                                 <tr>
-                                    <th style="width: 32%;">Name</th>
-                                    <th style="width: 22%;" class="center">Phone</th>
+                                    <th style="width: 22%;">Name</th>
+                                    <th style="width: 18%;" class="center">Phone</th>
+                                    <th style="width: 20%;">Address</th>
                                     <th>Notes</th>
-                                    <th style="width: 20%;">Last sale</th>
+                                    <th style="width: 18%;">Last sale</th>
+                                    <th style="width: 10%;" class="center">Actions</th>
                                 </tr>
                                 </thead>
                                 <tbody id="customers-table-body">
@@ -544,6 +551,10 @@
                                 <label class="field-label">Phone</label>
                                 <input id="customer-edit-phone" type="tel" class="field-input" autocomplete="off">
                             </div>
+                        </div>
+                        <div class="field">
+                            <label class="field-label">Address</label>
+                            <input id="customer-edit-address" type="text" class="field-input" autocomplete="off">
                         </div>
                         <div class="field">
                             <label class="field-label">Notes</label>
@@ -597,6 +608,14 @@
                                     <option value="">All Categories</option>
                                     <!-- Filled by JS -->
                                 </select>
+                                <select id="product-filter-brand" class="field-input" style="min-width: 150px;">
+                                    <option value="">All Brands</option>
+                                    <!-- Filled by JS -->
+                                </select>
+                                <select id="product-filter-supplier" class="field-input" style="min-width: 150px;">
+                                    <option value="">All Suppliers</option>
+                                    <!-- Filled by JS -->
+                                </select>
                                 <select id="product-sort" class="field-input" style="min-width: 150px;">
                                     <option value="name-asc">Name (A-Z)</option>
                                     <option value="name-desc">Name (Z-A)</option>
@@ -623,11 +642,13 @@
                                 <table>
                                     <thead>
                                     <tr>
-                                        <th style="width: 80px;">ID</th>
-                                        <th style="width: 25%;">Name</th>
+                                        <th style="width: 60px;">ID</th>
+                                        <th style="width: 18%;">Name</th>
                                         <th>SKU</th>
                                         <th>Barcode</th>
                                         <th>Category</th>
+                                        <th>Brand</th>
+                                        <th>Supplier</th>
                                         <th>Buy (৳)</th>
                                         <th>Sell (৳)</th>
                                         <th>Stock</th>
@@ -678,7 +699,22 @@
                                         <!-- Filled by JS -->
                                     </datalist>
                                 </div>
+                                <div class="field">
+                                    <label class="field-label">Brand (optional)</label>
+                                    <input id="product-edit-brand" type="text" class="field-input" autocomplete="off" placeholder="e.g., Samsung, Nike" list="brand-suggestions">
+                                    <datalist id="brand-suggestions">
+                                        <!-- Filled by JS -->
+                                    </datalist>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Supplier (optional)</label>
+                                    <input id="product-edit-supplier" type="text" class="field-input" autocomplete="off" placeholder="e.g., ABC Traders" list="supplier-suggestions">
+                                    <datalist id="supplier-suggestions">
+                                        <!-- Filled by JS -->
+                                    </datalist>
+                                </div>
                             </div>
+                        </div>  
                         <div class="two-col">
                             <div class="field">
                                 <label class="field-label">Buying Price (৳)</label>
@@ -798,9 +834,7 @@
                             </table>
                         </div>
                     </div>
-                </div>
-                    </div>
-                </div>
+                </div>                    
             </div>
         </div>
 
@@ -860,6 +894,7 @@
                                 <th>Items</th>
                                 <th>Total (৳)</th>
                                 <th>Profit (৳)</th>
+                                <th style="width: 80px;">Actions</th>
                             </tr>
                             </thead>
                             <tbody id="sales-table-body">

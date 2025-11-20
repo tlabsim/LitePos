@@ -77,12 +77,12 @@
         const canvas = els['salesChart'];
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        const width = canvas.clientWidth || 400; const height = 180; canvas.width = width; canvas.height = height;
+        const width = canvas.clientWidth || 400; const height = 200; canvas.width = width; canvas.height = height;
         ctx.clearRect(0, 0, width, height);
         const days = []; const today = new Date(); for (let i = 6; i >= 0; i--) { const d = new Date(today.getTime() - i * 86400000); days.push(toDateInput(d)); }
         const totals = days.map(dStr => { return (db.sales || []).filter(s => s.status === 'closed').filter(s => toDateInput(new Date(s.createdAt || s.updatedAt || new Date())) === dStr).reduce((sum, s) => sum + (s.total || 0), 0); });
         const max = Math.max(...totals, 1);
-        const paddingLeft = 40; const paddingRight = 10; const paddingBottom = 20; const paddingTop = 10; const chartWidth = width - paddingLeft - paddingRight; const chartHeight = height - paddingTop - paddingBottom;
+        const paddingLeft = 40; const paddingRight = 10; const paddingBottom = 20; const paddingTop = 20; const chartWidth = width - paddingLeft - paddingRight; const chartHeight = height - paddingTop - paddingBottom;
         ctx.font = '11px system-ui, sans-serif'; ctx.fillStyle = '#9ca3af'; ctx.strokeStyle = '#4b5563';
         ctx.beginPath(); ctx.moveTo(paddingLeft, paddingTop); ctx.lineTo(paddingLeft, paddingTop + chartHeight); ctx.lineTo(paddingLeft + chartWidth, paddingTop + chartHeight); ctx.stroke();
         const barWidth = chartWidth / (days.length * 1.4); const gap = barWidth * 0.4;

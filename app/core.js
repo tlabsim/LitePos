@@ -25,6 +25,14 @@
 
     // Cached DOM references
     const els = {};
+    const getElement = (id) => {
+        if (els[id]) return els[id];
+        else {
+            const el = document.getElementById(id);
+            els[id] = el;
+            return el;
+        }
+    };
 
     const modalNotifier = (() => {
         const elements = {
@@ -473,7 +481,7 @@
             'cart-table-body', 'cart-table-wrapper', 'cart-empty-state', 'cart-count-chip', 'sale-actions-row',
             'btn-new-sale', 'btn-hold-sale', 'btn-cancel-sale', 'btn-clear-cart',
             'open-sales-list',
-            'input-discount', 'input-payment', 'btn-same-as-total',
+            'input-discount', 'discount-percentage', 'input-payment', 'btn-same-as-total',
             'summary-subtotal', 'summary-total', 'summary-items-count',
             'summary-change', 'summary-sale-status', 'summary-sale-id-value',
             'btn-complete-sale',
@@ -487,14 +495,16 @@
 
             // Customers tab
             'customer-search', 'customers-table-body',
-            'customer-edit-name', 'customer-edit-phone', 'customer-edit-notes',
+            'customer-edit-name', 'customer-edit-phone', 'customer-edit-address', 'customer-edit-notes',
             'btn-save-customer-edit', 'btn-new-customer',
 
             // Products tab
             'product-manage-search', 'products-table-body',
             'product-edit-name', 'product-edit-sku', 'product-edit-barcode', 'product-edit-category',
+            'product-edit-brand', 'product-edit-supplier',
             'product-edit-buy', 'product-edit-sell',
             'product-edit-stock', 'product-edit-low',
+            'product-filter-category', 'product-filter-brand', 'product-filter-supplier',
             'btn-save-product', 'btn-new-product',
 
             // Sales tab
@@ -575,7 +585,6 @@
     }
 
     function showMainScreen() {
-        console.log('[showMainScreen] Called');
         if (els['login-screen']) els['login-screen'].classList.add('hidden');
         if (els['main-screen']) els['main-screen'].classList.remove('hidden');
         
@@ -583,14 +592,12 @@
         let savedTab = 'tab-sale';
         try {
             const stored = localStorage.getItem('litepos_current_tab');
-            console.log('[showMainScreen] Stored tab:', stored);
             if (stored && ['tab-sale', 'tab-customers', 'tab-products', 'tab-sales', 'tab-reports', 'tab-admin'].includes(stored)) {
                 savedTab = stored;
             }
         } catch (e) {
             console.error('Failed to restore tab:', e);
         }
-        console.log('[showMainScreen] Switching to tab:', savedTab);
         switchTab(savedTab);
         
         focusCustomerPhone();
@@ -752,7 +759,6 @@
         }
         if (els['btn-same-as-total']) {
             els['btn-same-as-total'].addEventListener('click', () => {
-                console.log('[Same as Payable] Button clicked');
                 
                 // Sync state from module if needed
                 if (window.LitePos && window.LitePos.state && window.LitePos.state.currentSale) {
@@ -765,18 +771,14 @@
                 
                 // Get the total amount
                 const totalAmount = currentSale.total || 0;
-                console.log('[Same as Payable] Total amount:', totalAmount);
                 
                 // Set the input value
                 if (els['input-payment']) {
-                    console.log('[Same as Payable] Input element found:', els['input-payment']);
                     els['input-payment'].value = String(totalAmount);
-                    console.log('[Same as Payable] Set input value to:', els['input-payment'].value);
                     
                     // Trigger the input event to update currentSale.payment and call updateSaleTotals
                     const event = new Event('input', { bubbles: true });
                     els['input-payment'].dispatchEvent(event);
-                    console.log('[Same as Payable] Dispatched input event');
                 } else {
                     console.error('[Same as Payable] Input element NOT found!');
                 }
@@ -850,6 +852,8 @@
             els['btn-clear-product-search'].addEventListener('click', () => {
                 if (els['product-search']) {
                     els['product-search'].value = '';
+                    // Focus back to input
+                    els['product-search'].focus();
                     renderProductSearchTable();
                 }
             });
@@ -875,6 +879,18 @@
         }
         if (els['product-filter-category']) {
             els['product-filter-category'].addEventListener('change', () => {
+                currentProductsPage = 1; // Reset to first page on filter
+                renderProductsTable();
+            });
+        }
+        if (els['product-filter-brand']) {
+            els['product-filter-brand'].addEventListener('change', () => {
+                currentProductsPage = 1; // Reset to first page on filter
+                renderProductsTable();
+            });
+        }
+        if (els['product-filter-supplier']) {
+            els['product-filter-supplier'].addEventListener('change', () => {
                 currentProductsPage = 1; // Reset to first page on filter
                 renderProductsTable();
             });
@@ -1044,9 +1060,6 @@
     }
 
     function switchTab(tabId) {
-        console.log('[switchTab] Called with tabId:', tabId);
-        console.log('[switchTab] els object keys:', Object.keys(els).length);
-        console.log('[switchTab] tab-sale element:', els['tab-sale']);
         
         els.navButtons.forEach(btn => {
             const tab = btn.getAttribute('data-tab');
@@ -1061,7 +1074,6 @@
         tabIds.forEach(id => {
             if (els[id]) {
                 if (id === tabId) {
-                    console.log('[switchTab] Removing hidden from:', id);
                     els[id].classList.remove('hidden');
                 } else {
                     els[id].classList.add('hidden');
@@ -1281,7 +1293,8 @@
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             customer: null,
-            salespersonId: currentUser ? currentUser.id : null
+            salespersonId: currentUser ? currentUser.id : null,
+            lastModifiedBy: currentUser ? currentUser.id : null
         };
     }
 
@@ -1353,22 +1366,17 @@
     }
 
     function updateSaleTotals() {
-        console.log('[updateSaleTotals CORE] Called, currentSale.payment:', currentSale?.payment);
         if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.updateSaleTotals === 'function') {
             try {
-                console.log('[updateSaleTotals CORE] Delegating to module...');
                 // Sync core state to module state before calling
                 if (window.LitePos.state) {
                     window.LitePos.state.currentSale = currentSale;
                     window.LitePos.state.db = db;
-                    console.log('[updateSaleTotals CORE] Before module, state.payment:', window.LitePos.state.currentSale?.payment);
                 }
                 window.LitePos.pos.updateSaleTotals();
                 // Sync back
                 if (window.LitePos.state && window.LitePos.state.currentSale) {
-                    console.log('[updateSaleTotals CORE] After module, state.payment:', window.LitePos.state.currentSale.payment);
                     currentSale = window.LitePos.state.currentSale;
-                    console.log('[updateSaleTotals CORE] Synced back, currentSale.payment:', currentSale.payment);
                 }
                 return;
             } catch (e) { console.error(e); }
@@ -1394,6 +1402,13 @@
         if (els['sale-header-total']) els['sale-header-total'].textContent = formatMoney(currentSale.total);
         els['summary-items-count'].textContent = String(currentSale.items.reduce((s, it) => s + it.qty, 0));
         els['summary-change'].textContent = formatMoney(currentSale.change);
+        
+        // Update discount percentage
+        if (els['discount-percentage']) {
+            const discountPercent = subtotal > 0 ? ((currentSale.discount / subtotal) * 100).toFixed(1) : 0;
+            els['discount-percentage'].textContent = `${discountPercent}%`;
+        }
+        
         // Only update input fields if user is not actively editing them
         const active = document.activeElement;
         if (active !== els['input-discount']) {
@@ -2098,6 +2113,46 @@
         showToast('Open sale', `Resumed ${sale.id}.`, 'success');
     }
 
+    function loadSaleForEditing(saleId) {
+        const sale = db.sales.find(s => s.id === saleId);
+        if (!sale) {
+            return showToast('Edit sale', 'Sale not found.', 'error');
+        }
+
+        const activeSaleId = currentSale && currentSale.id ? currentSale.id : null;
+        const activeHasItems = currentSale && Array.isArray(currentSale.items) && currentSale.items.length > 0;
+        
+        if (activeSaleId === saleId) {
+            switchTab('tab-sale');
+            return showToast('Edit sale', `Sale ${saleId} is already loaded for editing.`, 'info');
+        }
+
+        if (activeHasItems && activeSaleId && activeSaleId !== saleId) {
+            if (!confirm(`Save current sale ${activeSaleId} before editing ${saleId}?`)) {
+                return;
+            }
+            persistSaleAsOpen(currentSale);
+        }
+
+        currentSale = structuredCloneSale(sale);
+        if (window.LitePos && window.LitePos.state) {
+            window.LitePos.state.currentSale = currentSale;
+        }
+        setCurrentCustomer(currentSale.customer || null);
+        renderCartTable();
+        updateSaleTotals();
+        
+        const statusLabel = sale.status === 'closed' ? 'Editing Closed' : (sale.status === 'open' ? 'Editing Open' : 'Editing');
+        els['summary-sale-status'].textContent = `${statusLabel} · ${sale.id}`;
+        if (els['summary-sale-id-value']) els['summary-sale-id-value'].textContent = sale.id;
+        
+        switchTab('tab-sale');
+        focusProductSearch();
+        showToast('Edit mode', `Editing sale ${sale.id}. Changes will update the original.`, 'success');
+    }
+
+    window.loadSaleForEditing = loadSaleForEditing;
+
     // -------------------------
     // POS: RECEIPT
     // -------------------------
@@ -2198,17 +2253,13 @@
     // -------------------------
 
     function renderCustomersTable() {
-        console.log('[renderCustomersTable] Called');
-        console.log('[renderCustomersTable] els[customers-table-body]:', els['customers-table-body']);
         if (window.LitePos && window.LitePos.customers && typeof window.LitePos.customers.renderCustomersTable === 'function') {
             try {
-                console.log('[renderCustomersTable] Delegating to module');
                 if (window.LitePos.state) window.LitePos.state.db = db;
                 window.LitePos.customers.renderCustomersTable();
                 return;
             } catch (e) { console.error(e); }
         }
-        console.log('[renderCustomersTable] Using fallback, db.customers:', db.customers?.length);
         const tbody = els['customers-table-body'];
         if (!tbody) {
             console.error('[renderCustomersTable] tbody element not found!');
@@ -2268,6 +2319,7 @@
         if (!c) return;
         els['customer-edit-name'].value = c.name;
         els['customer-edit-phone'].value = c.phone;
+        els['customer-edit-address'].value = c.address || '';
         els['customer-edit-notes'].value = c.notes || '';
         els['customer-edit-name'].dataset.customerId = c.id;
     }
@@ -2281,6 +2333,7 @@
         }
         els['customer-edit-name'].value = '';
         els['customer-edit-phone'].value = '';
+        els['customer-edit-address'].value = '';
         els['customer-edit-notes'].value = '';
         delete els['customer-edit-name'].dataset.customerId;
     }
@@ -2296,6 +2349,7 @@
         }
         const name = els['customer-edit-name'].value.trim();
         const phone = (els['customer-edit-phone'].value || '').trim();
+        const address = (els['customer-edit-address'].value || '').trim();
         const notes = (els['customer-edit-notes'].value || '').trim();
         if (!name) return showToast('Customer', 'Name is required.', 'error');
 
@@ -2316,12 +2370,14 @@
         if (customer) {
             customer.name = name;
             customer.phone = phone;
+            customer.address = address;
             customer.notes = notes;
         } else {
             customer = {
                 id: 'c' + (db.customers.length + 1),
                 name,
                 phone,
+                address,
                 notes,
                 lastSaleAt: null,
                 lastSaleTotal: 0
@@ -2345,6 +2401,8 @@
         tbody.innerHTML = '';
         const query = (els['product-manage-search'].value || '').trim().toLowerCase();
         const categoryFilter = els['product-filter-category'] ? els['product-filter-category'].value : '';
+        const brandFilter = els['product-filter-brand'] ? els['product-filter-brand'].value : '';
+        const supplierFilter = els['product-filter-supplier'] ? els['product-filter-supplier'].value : '';
         const lowStockOnly = els['product-filter-low-stock'] ? els['product-filter-low-stock'].checked : false;
         const sortBy = els['product-sort'] ? els['product-sort'].value : 'name-asc';
 
@@ -2353,13 +2411,21 @@
         
         if (query) {
             filtered = filtered.filter(p => {
-                const txt = (p.name + ' ' + p.sku + ' ' + (p.barcode || '') + ' ' + (p.category || '')).toLowerCase();
+                const txt = (p.name + ' ' + p.sku + ' ' + (p.barcode || '') + ' ' + (p.category || '') + ' ' + (p.brand || '') + ' ' + (p.supplier || '')).toLowerCase();
                 return txt.includes(query);
             });
         }
         
         if (categoryFilter) {
             filtered = filtered.filter(p => p.category === categoryFilter);
+        }
+        
+        if (brandFilter) {
+            filtered = filtered.filter(p => p.brand === brandFilter);
+        }
+        
+        if (supplierFilter) {
+            filtered = filtered.filter(p => p.supplier === supplierFilter);
         }
         
         if (lowStockOnly) {
@@ -2454,6 +2520,16 @@
             tdCategory.style.fontSize = '12px';
             tr.appendChild(tdCategory);
 
+            const tdBrand = document.createElement('td');
+            tdBrand.textContent = p.brand || '—';
+            tdBrand.style.fontSize = '12px';
+            tr.appendChild(tdBrand);
+
+            const tdSupplier = document.createElement('td');
+            tdSupplier.textContent = p.supplier || '—';
+            tdSupplier.style.fontSize = '12px';
+            tr.appendChild(tdSupplier);
+
             const tdBuy = document.createElement('td');
             tdBuy.textContent = formatMoney(p.buyPrice);
             tr.appendChild(tdBuy);
@@ -2473,8 +2549,10 @@
             tbody.appendChild(tr);
         });
         
-        // Update category suggestions
+        // Update dropdowns and datalists
         updateCategorySuggestions();
+        updateBrandSuggestions();
+        updateSupplierSuggestions();
     }
     
     function updateCategorySuggestions() {
@@ -2504,6 +2582,62 @@
         }
     }
 
+    function updateBrandSuggestions() {
+        // Update brand filter dropdown
+        if (els['product-filter-brand']) {
+            const brands = [...new Set(db.products.map(p => p.brand).filter(b => b))].sort();
+            const currentValue = els['product-filter-brand'].value;
+            els['product-filter-brand'].innerHTML = '<option value="">All Brands</option>';
+            brands.forEach(brand => {
+                const opt = document.createElement('option');
+                opt.value = brand;
+                opt.textContent = brand;
+                els['product-filter-brand'].appendChild(opt);
+            });
+            els['product-filter-brand'].value = currentValue;
+        }
+        
+        // Update brand datalist for autocomplete
+        const datalist = document.getElementById('brand-suggestions');
+        if (datalist) {
+            const brands = [...new Set(db.products.map(p => p.brand).filter(b => b))].sort();
+            datalist.innerHTML = '';
+            brands.forEach(brand => {
+                const opt = document.createElement('option');
+                opt.value = brand;
+                datalist.appendChild(opt);
+            });
+        }
+    }
+
+    function updateSupplierSuggestions() {
+        // Update supplier filter dropdown
+        if (els['product-filter-supplier']) {
+            const suppliers = [...new Set(db.products.map(p => p.supplier).filter(s => s))].sort();
+            const currentValue = els['product-filter-supplier'].value;
+            els['product-filter-supplier'].innerHTML = '<option value="">All Suppliers</option>';
+            suppliers.forEach(supplier => {
+                const opt = document.createElement('option');
+                opt.value = supplier;
+                opt.textContent = supplier;
+                els['product-filter-supplier'].appendChild(opt);
+            });
+            els['product-filter-supplier'].value = currentValue;
+        }
+        
+        // Update supplier datalist for autocomplete
+        const datalist = document.getElementById('supplier-suggestions');
+        if (datalist) {
+            const suppliers = [...new Set(db.products.map(p => p.supplier).filter(s => s))].sort();
+            datalist.innerHTML = '';
+            suppliers.forEach(supplier => {
+                const opt = document.createElement('option');
+                opt.value = supplier;
+                datalist.appendChild(opt);
+            });
+        }
+    }
+
     function loadProductToForm(id) {
         if (window.LitePos && window.LitePos.products && typeof window.LitePos.products.loadProductToForm === 'function') {
             try { return window.LitePos.products.loadProductToForm(id); } catch (e) { console.error(e); }
@@ -2514,6 +2648,8 @@
         els['product-edit-sku'].value = p.sku;
         if (els['product-edit-barcode']) els['product-edit-barcode'].value = p.barcode || '';
         if (els['product-edit-category']) els['product-edit-category'].value = p.category || '';
+        if (els['product-edit-brand']) els['product-edit-brand'].value = p.brand || '';
+        if (els['product-edit-supplier']) els['product-edit-supplier'].value = p.supplier || '';
         els['product-edit-buy'].value = p.buyPrice;
         els['product-edit-sell'].value = p.sellPrice;
         els['product-edit-stock'].value = p.stock;
@@ -2557,6 +2693,8 @@
         els['product-edit-sku'].value = '';
         if (els['product-edit-barcode']) els['product-edit-barcode'].value = '';
         if (els['product-edit-category']) els['product-edit-category'].value = '';
+        if (els['product-edit-brand']) els['product-edit-brand'].value = '';
+        if (els['product-edit-supplier']) els['product-edit-supplier'].value = '';
         els['product-edit-buy'].value = '';
         els['product-edit-sell'].value = '';
         els['product-edit-stock'].value = '';
@@ -2627,6 +2765,8 @@
         const sku = els['product-edit-sku'].value.trim();
         const barcode = els['product-edit-barcode'] ? els['product-edit-barcode'].value.trim() : '';
         const category = els['product-edit-category'] ? els['product-edit-category'].value.trim() : '';
+        const brand = els['product-edit-brand'] ? els['product-edit-brand'].value.trim() : '';
+        const supplier = els['product-edit-supplier'] ? els['product-edit-supplier'].value.trim() : '';
         const buy = parseMoneyInput(els['product-edit-buy'].value);
         const sell = parseMoneyInput(els['product-edit-sell'].value);
         const stock = parseInt(els['product-edit-stock'].value || '0', 10);
@@ -2664,6 +2804,8 @@
             product.sku = sku;
             product.barcode = barcode;
             product.category = category;
+            product.brand = brand;
+            product.supplier = supplier;
             product.buyPrice = buy;
             product.sellPrice = sell;
             product.stock = stock;
@@ -2675,6 +2817,8 @@
                 sku,
                 barcode,
                 category,
+                brand,
+                supplier,
                 buyPrice: buy,
                 sellPrice: sell,
                 stock,
@@ -2768,15 +2912,12 @@
     }
     
     function renderStockUpdatesTable(productId) {
-        console.log('[STOCK HISTORY] Called for product:', productId);
         
         // Use getElementById to ensure we get the element even if cache is stale
         const tbody = document.getElementById('stock-updates-table-body');
         const body = document.getElementById('stock-updates-body');
         const btn = document.getElementById('btn-toggle-stock-updates');
-        
-        console.log('[STOCK HISTORY] Found elements - tbody:', !!tbody, 'body:', !!body, 'btn:', !!btn);
-        
+             
         if (!tbody) {
             console.error('[STOCK HISTORY] tbody element NOT FOUND!');
             return;
@@ -2785,13 +2926,9 @@
         
         if (!db.stock_updates) db.stock_updates = [];
         
-        console.log('[STOCK HISTORY] Total in DB:', db.stock_updates.length);
-        
         const updates = db.stock_updates
             .filter(u => u.productId === productId)
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        
-        console.log('[STOCK HISTORY] Filtered for product:', updates.length, updates);
         
         if (updates.length === 0) {
             const tr = document.createElement('tr');
@@ -2802,18 +2939,15 @@
             td.style.color = 'var(--text-soft)';
             tr.appendChild(td);
             tbody.appendChild(tr);
-            console.log('[STOCK HISTORY] No updates - added empty message row');
             return;
         }
         
         // Auto-expand the table if there are updates  
         if (body && btn && updates.length > 0) {
             body.style.display = 'block';
-            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>Collapse';
-            console.log('[STOCK HISTORY] Auto-expanded table body');
+            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>Collapse';          
         }
         
-        console.log('[STOCK HISTORY] Creating', updates.length, 'table rows...');
         updates.forEach((u, idx) => {
             const tr = document.createElement('tr');
             
@@ -2843,7 +2977,6 @@
             
             tbody.appendChild(tr);
         });
-        console.log('[STOCK HISTORY] Finished! tbody now has', tbody.children.length, 'rows');
     }
 
     // -------------------------

@@ -48,12 +48,16 @@
             .forEach((c, idx) => {
                 console.log('[customers.js] Processing customer', idx, c.name);
                 if (query) {
-                    const text = (c.name + ' ' + c.phone + ' ' + (c.notes || '')).toLowerCase();
+                    const text = (c.name + ' ' + c.phone + ' ' + (c.address || '') + ' ' + (c.notes || '')).toLowerCase();
                     if (!text.includes(query)) return;
                 }
 
                 const tr = document.createElement('tr');
-                tr.addEventListener('click', () => loadCustomerToForm(c.id));
+                tr.addEventListener('click', (e) => {
+                    // Don't load form if clicking delete button
+                    if (e.target.closest('.btn-delete-customer')) return;
+                    loadCustomerToForm(c.id);
+                });
 
                 const tdName = document.createElement('td');
                 tdName.textContent = c.name;
@@ -63,6 +67,10 @@
                 tdPhone.textContent = c.phone || '—';
                 tdPhone.style.textAlign = 'center';
                 tr.appendChild(tdPhone);
+
+                const tdAddress = document.createElement('td');
+                tdAddress.textContent = c.address || '—';
+                tr.appendChild(tdAddress);
 
                 const tdNotes = document.createElement('td');
                 tdNotes.textContent = c.notes || '';
@@ -77,6 +85,19 @@
                 }
                 tr.appendChild(tdLast);
 
+                const tdActions = document.createElement('td');
+                tdActions.style.textAlign = 'center';
+                const btnDelete = document.createElement('button');
+                btnDelete.className = 'btn btn-sm btn-ghost btn-delete-customer';
+                btnDelete.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px;"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>`;
+                btnDelete.title = 'Delete customer';
+                btnDelete.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteCustomer(c.id);
+                });
+                tdActions.appendChild(btnDelete);
+                tr.appendChild(tdActions);
+
                 tbody.appendChild(tr);
                 console.log('[customers.js] Appended row for customer', c.name);
             });
@@ -90,6 +111,7 @@
         if (!c) return;
         if (els['customer-edit-name']) els['customer-edit-name'].value = c.name;
         if (els['customer-edit-phone']) els['customer-edit-phone'].value = c.phone;
+        if (els['customer-edit-address']) els['customer-edit-address'].value = c.address || '';
         if (els['customer-edit-notes']) els['customer-edit-notes'].value = c.notes || '';
         if (els['customer-edit-name']) els['customer-edit-name'].dataset.customerId = c.id;
     }
@@ -98,6 +120,7 @@
         const els = _getEls();
         if (els['customer-edit-name']) els['customer-edit-name'].value = '';
         if (els['customer-edit-phone']) els['customer-edit-phone'].value = '';
+        if (els['customer-edit-address']) els['customer-edit-address'].value = '';
         if (els['customer-edit-notes']) els['customer-edit-notes'].value = '';
         if (els['customer-edit-name']) delete els['customer-edit-name'].dataset.customerId;
     }
@@ -107,6 +130,7 @@
         const db = _getDb();
         const name = (els['customer-edit-name'] && els['customer-edit-name'].value || '').trim();
         const phone = (els['customer-edit-phone'] && els['customer-edit-phone'].value || '').trim();
+        const address = (els['customer-edit-address'] && els['customer-edit-address'].value || '').trim();
         const notes = (els['customer-edit-notes'] && els['customer-edit-notes'].value || '').trim();
         if (!name) return _showToast('Customer', 'Name is required.', 'error');
 
@@ -124,12 +148,14 @@
         if (customer) {
             customer.name = name;
             customer.phone = phone;
+            customer.address = address;
             customer.notes = notes;
         } else {
             customer = {
                 id: 'c' + (db.customers.length + 1),
                 name,
                 phone,
+                address,
                 notes,
                 lastSaleAt: null,
                 lastSaleTotal: 0
@@ -273,6 +299,26 @@
         if (customers.length > 0) overlay.classList.remove('hidden'); else overlay.classList.add('hidden');
     }
 
+    function deleteCustomer(id) {
+        const db = _getDb();
+        const customer = db.customers.find(c => c.id === id);
+        if (!customer) return;
+        
+        // Confirm deletion
+        const confirmed = confirm(`Delete customer "${customer.name}"?\n\nThis action cannot be undone.`);
+        if (!confirmed) return;
+        
+        // Remove customer from array
+        const idx = db.customers.findIndex(c => c.id === id);
+        if (idx > -1) {
+            db.customers.splice(idx, 1);
+            if (API && typeof API.saveDb === 'function') API.saveDb();
+            else if (typeof window.saveDb === 'function') window.saveDb();
+            renderCustomersTable();
+            _showToast('Customer deleted', `${customer.name} has been removed.`, 'success');
+        }
+    }
+
     function formatMoney(v) {
         if (UTILS && typeof UTILS.formatMoney === 'function') return UTILS.formatMoney(v);
         const n = Number(v || 0); return '৳ ' + n.toFixed(2);
@@ -287,7 +333,8 @@
         findCustomerFromInput,
         setCurrentCustomer,
         saveQuickCustomer,
-        focusCustomerPhone
+        focusCustomerPhone,
+        deleteCustomer
     };
 
     // Live customer search: show overlay while typing phone (>=3 chars)

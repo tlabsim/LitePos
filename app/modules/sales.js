@@ -145,6 +145,23 @@
                 tdProfit.textContent = (UTILS && typeof UTILS.formatMoney === 'function') ? UTILS.formatMoney(computeProfitForSale(sale)) : formatMoney(computeProfitForSale(sale));
                 tr.appendChild(tdProfit);
 
+                const tdActions = document.createElement('td');
+                tdActions.style.textAlign = 'center';
+                const btnModify = document.createElement('button');
+                btnModify.type = 'button';
+                btnModify.className = 'btn btn-primary';
+                btnModify.style.padding = '4px 10px';
+                btnModify.style.fontSize = '12px';
+                btnModify.textContent = 'Modify';
+                btnModify.title = 'Edit this sale';
+                btnModify.addEventListener('click', () => {
+                    if (typeof window.loadSaleForEditing === 'function') {
+                        window.loadSaleForEditing(sale.id);
+                    }
+                });
+                tdActions.appendChild(btnModify);
+                tr.appendChild(tdActions);
+
                 tbody.appendChild(tr);
             });
     }

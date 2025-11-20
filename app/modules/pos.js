@@ -48,7 +48,8 @@
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             customer: null,
-            salespersonId: (state.currentUser && state.currentUser.id) || null
+            salespersonId: (state.currentUser && state.currentUser.id) || null,
+            lastModifiedBy: (state.currentUser && state.currentUser.id) || null
         };
     };
 
@@ -71,7 +72,7 @@
         if (ns.pos.renderCartTable) ns.pos.renderCartTable();
         if (ns.pos.updateSaleTotals) ns.pos.updateSaleTotals();
         if (notify && ns.ui && typeof ns.ui.showToast === 'function') ns.ui.showToast('New sale', 'Started a new sale.', 'success');
-        if (els['sale-customer-phone']) { els['sale-customer-phone'].focus(); els['sale-customer-phone'].select(); }
+        if (els['product-search']) { els['product-search'].focus();}
         
         // Clear any auto-save when explicitly starting new sale
         if (notify && ns.pos.clearAutoSave) ns.pos.clearAutoSave();
@@ -79,7 +80,10 @@
 
     ns.pos.clearCart = function () {
         if (!ns.state.currentSale) return;
+        const hadId = !!ns.state.currentSale.id;
         ns.state.currentSale.items = [];
+        // If cart had a sale ID and now empty, keep the ID (editing mode) but don't remove from open sales
+        // The sale remains in DB as open/closed with its ID intact
         if (ns.pos.updateSaleTotals) ns.pos.updateSaleTotals();
         if (ns.pos.renderCartTable) ns.pos.renderCartTable();
     };
@@ -98,7 +102,6 @@
     };
 
     ns.pos.updateSaleTotals = function () {
-        console.log('[updateSaleTotals MODULE] Called, state.currentSale.payment:', ns.state.currentSale?.payment);
         if (!ns.state.currentSale) return;
         let subtotal = 0;
         ns.state.currentSale.items.forEach(it => { subtotal += it.qty * it.price; });
@@ -123,6 +126,14 @@
         if (els['sale-header-total']) els['sale-header-total'].textContent = formatMoney(ns.state.currentSale.total);
         if (els['summary-items-count']) els['summary-items-count'].textContent = String(ns.state.currentSale.items.reduce((s, it) => s + it.qty, 0));
         if (els['summary-change']) els['summary-change'].textContent = formatMoney(ns.state.currentSale.change);
+        
+        // Update discount percentage
+        if (getElement('discount-percentage')) {
+            console.log('[updateSaleTotals MODULE] Updating discount percentage display');
+            const discountPercent = subtotal > 0 ? ((ns.state.currentSale.discount / subtotal) * 100).toFixed(1) : 0;
+            els['discount-percentage'].textContent = `${discountPercent}%`;
+        }
+        
         // Only update input fields if user is not actively editing them
         try {
             const active = document.activeElement;
@@ -222,8 +233,12 @@
         if (!ns.state.currentSale) return;
         try {
             const saleKey = 'litepos_current_sale_autosave';
-            // Save complete sale including customer info
-            localStorage.setItem(saleKey, JSON.stringify(ns.state.currentSale));
+            // Save complete sale including customer info and sale ID (for editing mode)
+            const saleToSave = {
+                ...ns.state.currentSale,
+                lastModifiedBy: (ns.state.currentUser && ns.state.currentUser.id) || ns.state.currentSale.lastModifiedBy
+            };
+            localStorage.setItem(saleKey, JSON.stringify(saleToSave));
         } catch (e) {
             console.error('Auto-save failed:', e);
         }
@@ -242,6 +257,18 @@
                     // Restore customer info to UI
                     if (sale.customer && window.LitePos.customers && typeof window.LitePos.customers.setCurrentCustomer === 'function') {
                         window.LitePos.customers.setCurrentCustomer(sale.customer);
+                    }
+                    
+                    // Update sale status and ID display for editing mode
+                    const els = ns.elements || {};
+                    if (sale.id) {
+                        if (els['summary-sale-status']) {
+                            const statusText = sale.status === 'closed' ? 'Closed' : (sale.status === 'open' ? 'Open' : 'Editing');
+                            els['summary-sale-status'].textContent = `${statusText} · ${sale.id}`;
+                        }
+                        if (els['summary-sale-id-value']) {
+                            els['summary-sale-id-value'].textContent = sale.id;
+                        }
                     }
                     
                     if (ns.pos.renderCartTable) ns.pos.renderCartTable();
@@ -273,6 +300,7 @@
         }
         ns.state.currentSale.status = 'open';
         ns.state.currentSale.updatedAt = new Date().toISOString();
+        ns.state.currentSale.lastModifiedBy = (ns.state.currentUser && ns.state.currentUser.id) || ns.state.currentSale.lastModifiedBy;
         const now = new Date().toISOString();
         if (!ns.state.currentSale.id) {
             const newId = 'S' + String(ns.state.db.counters.nextSaleId++).padStart(4, '0');
@@ -329,6 +357,7 @@
         if (ns.state.currentSale.total <= 0) { if (ns.ui) ns.ui.showToast('Complete sale', 'Total must be greater than 0.', 'error'); return; }
         if ((ns.state.currentSale.payment || 0) < ns.state.currentSale.total) { if (ns.ui) ns.ui.showToast('Payment insufficient', 'Payment must cover total.', 'error'); return; }
         const now = new Date().toISOString(); ns.state.currentSale.status = 'closed'; ns.state.currentSale.updatedAt = now; if (!ns.state.currentSale.createdAt) ns.state.currentSale.createdAt = now;
+        ns.state.currentSale.lastModifiedBy = (ns.state.currentUser && ns.state.currentUser.id) || ns.state.currentSale.lastModifiedBy;
         if (!ns.state.currentSale.id) { const newId = 'S' + String(ns.state.db.counters.nextSaleId++).padStart(4, '0'); ns.state.currentSale.id = newId; }
         ns.state.currentSale.items.forEach(it => { const product = ns.state.db.products.find(p => p.sku === it.sku); if (product) product.stock = Math.max(0, (product.stock || 0) - it.qty); });
         const idx = ns.state.db.sales.findIndex(s => s.id === ns.state.currentSale.id);

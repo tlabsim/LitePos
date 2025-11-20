@@ -26,14 +26,14 @@
         if (target.flags && target.flags.seededSampleData) return;
 
         target.products = [
-            { id: 'p1', name: 'Milk 1L', sku: 'MILK-1L', buyPrice: 80, sellPrice: 95, stock: 30, lowStockAt: 5, createdAt: new Date().toISOString() },
-            { id: 'p2', name: 'Eggs (Dozen)', sku: 'EGG-12', buyPrice: 110, sellPrice: 130, stock: 20, lowStockAt: 4, createdAt: new Date().toISOString() },
-            { id: 'p3', name: 'Rice 5kg', sku: 'RICE-5KG', buyPrice: 450, sellPrice: 520, stock: 15, lowStockAt: 3, createdAt: new Date().toISOString() }
+            { id: 'p1', name: 'Milk 1L', sku: 'MILK-1L', brand: 'Fresh Dairy', supplier: 'Dairy Co Ltd', buyPrice: 80, sellPrice: 95, stock: 30, lowStockAt: 5, createdAt: new Date().toISOString() },
+            { id: 'p2', name: 'Eggs (Dozen)', sku: 'EGG-12', brand: 'Farm Fresh', supplier: 'Local Farms', buyPrice: 110, sellPrice: 130, stock: 20, lowStockAt: 4, createdAt: new Date().toISOString() },
+            { id: 'p3', name: 'Rice 5kg', sku: 'RICE-5KG', brand: 'Golden Harvest', supplier: 'Rice Traders', buyPrice: 450, sellPrice: 520, stock: 15, lowStockAt: 3, createdAt: new Date().toISOString() }
         ];
 
         target.customers = [
-            { id: 'c1', name: 'Walk-in', phone: '', notes: 'Default walk-in customer', lastSaleAt: null, lastSaleTotal: 0 },
-            { id: 'c2', name: 'Rahim Uddin', phone: '01711111111', notes: 'Nearby grocery shop regular', lastSaleAt: null, lastSaleTotal: 0 }
+            { id: 'c1', name: 'Walk-in', phone: '', address: '', notes: 'Default walk-in customer', lastSaleAt: null, lastSaleTotal: 0 },
+            { id: 'c2', name: 'Rahim Uddin', phone: '01711111111', address: 'Dhanmondi, Dhaka', notes: 'Nearby grocery shop regular', lastSaleAt: null, lastSaleTotal: 0 }
         ];
 
         target.flags = target.flags || {};

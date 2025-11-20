@@ -75,6 +75,8 @@
         
         const query = (els['product-manage-search'] && els['product-manage-search'].value || '').trim().toLowerCase();
         const categoryFilter = els['product-filter-category'] ? els['product-filter-category'].value : '';
+        const brandFilter = els['product-filter-brand'] ? els['product-filter-brand'].value : '';
+        const supplierFilter = els['product-filter-supplier'] ? els['product-filter-supplier'].value : '';
         const lowStockOnly = els['product-filter-low-stock'] ? els['product-filter-low-stock'].checked : false;
         const sortBy = els['product-sort'] ? els['product-sort'].value : 'name-asc';
 
@@ -83,7 +85,7 @@
         // Apply search filter
         let filtered = allProducts.filter(p => {
             if (query) {
-                const txt = (p.name + ' ' + p.sku + ' ' + (p.barcode || '') + ' ' + (p.category || '')).toLowerCase();
+                const txt = (p.name + ' ' + p.sku + ' ' + (p.barcode || '') + ' ' + (p.category || '') + ' ' + (p.brand || '') + ' ' + (p.supplier || '')).toLowerCase();
                 if (!txt.includes(query)) return false;
             }
             return true;
@@ -92,6 +94,16 @@
         // Apply category filter
         if (categoryFilter) {
             filtered = filtered.filter(p => p.category === categoryFilter);
+        }
+        
+        // Apply brand filter
+        if (brandFilter) {
+            filtered = filtered.filter(p => p.brand === brandFilter);
+        }
+        
+        // Apply supplier filter
+        if (supplierFilter) {
+            filtered = filtered.filter(p => p.supplier === supplierFilter);
         }
         
         // Apply low stock filter
@@ -176,6 +188,16 @@
             tdCategory.style.fontSize = '12px'; 
             tr.appendChild(tdCategory);
             
+            const tdBrand = document.createElement('td'); 
+            tdBrand.textContent = p.brand || '—'; 
+            tdBrand.style.fontSize = '12px'; 
+            tr.appendChild(tdBrand);
+            
+            const tdSupplier = document.createElement('td'); 
+            tdSupplier.textContent = p.supplier || '—'; 
+            tdSupplier.style.fontSize = '12px'; 
+            tr.appendChild(tdSupplier);
+            
             const tdBuy = document.createElement('td'); 
             tdBuy.textContent = formatMoney(p.buyPrice); 
             tr.appendChild(tdBuy);
@@ -195,8 +217,13 @@
             tbody.appendChild(tr);
         });
         
-        // Update category dropdown
+        // Update dropdowns and datalists
         updateCategoryDropdown();
+        updateBrandDropdown();
+        updateSupplierDropdown();
+        updateCategorySuggestions();
+        updateBrandSuggestions();
+        updateSupplierSuggestions();
     }
     
     function updateCategoryDropdown() {
@@ -219,6 +246,95 @@
         if (currentValue && categories.includes(currentValue)) {
             els['product-filter-category'].value = currentValue;
         }
+    }
+
+    function updateBrandDropdown() {
+        const els = _getEls();
+        const db = _getDb();
+        if (!els['product-filter-brand']) return;
+        
+        const brands = [...new Set(db.products.map(p => p.brand).filter(b => b))].sort();
+        const currentValue = els['product-filter-brand'].value;
+        
+        els['product-filter-brand'].innerHTML = '<option value="">All Brands</option>';
+        brands.forEach(brand => {
+            const opt = document.createElement('option');
+            opt.value = brand;
+            opt.textContent = brand;
+            els['product-filter-brand'].appendChild(opt);
+        });
+        
+        // Restore selected value if it still exists
+        if (currentValue && brands.includes(currentValue)) {
+            els['product-filter-brand'].value = currentValue;
+        }
+    }
+
+    function updateSupplierDropdown() {
+        const els = _getEls();
+        const db = _getDb();
+        if (!els['product-filter-supplier']) return;
+        
+        const suppliers = [...new Set(db.products.map(p => p.supplier).filter(s => s))].sort();
+        const currentValue = els['product-filter-supplier'].value;
+        
+        els['product-filter-supplier'].innerHTML = '<option value="">All Suppliers</option>';
+        suppliers.forEach(supplier => {
+            const opt = document.createElement('option');
+            opt.value = supplier;
+            opt.textContent = supplier;
+            els['product-filter-supplier'].appendChild(opt);
+        });
+        
+        // Restore selected value if it still exists
+        if (currentValue && suppliers.includes(currentValue)) {
+            els['product-filter-supplier'].value = currentValue;
+        }
+    }
+
+    function updateCategorySuggestions() {
+        const els = _getEls();
+        const db = _getDb();
+        const datalist = document.getElementById('category-suggestions');
+        if (!datalist) return;
+        
+        const categories = [...new Set(db.products.map(p => p.category).filter(c => c))].sort();
+        datalist.innerHTML = '';
+        categories.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            datalist.appendChild(opt);
+        });
+    }
+
+    function updateBrandSuggestions() {
+        const els = _getEls();
+        const db = _getDb();
+        const datalist = document.getElementById('brand-suggestions');
+        if (!datalist) return;
+        
+        const brands = [...new Set(db.products.map(p => p.brand).filter(b => b))].sort();
+        datalist.innerHTML = '';
+        brands.forEach(brand => {
+            const opt = document.createElement('option');
+            opt.value = brand;
+            datalist.appendChild(opt);
+        });
+    }
+
+    function updateSupplierSuggestions() {
+        const els = _getEls();
+        const db = _getDb();
+        const datalist = document.getElementById('supplier-suggestions');
+        if (!datalist) return;
+        
+        const suppliers = [...new Set(db.products.map(p => p.supplier).filter(s => s))].sort();
+        datalist.innerHTML = '';
+        suppliers.forEach(supplier => {
+            const opt = document.createElement('option');
+            opt.value = supplier;
+            datalist.appendChild(opt);
+        });
     }
 
     function renderProductSearchTable() {
@@ -295,6 +411,8 @@
         if (els['product-edit-sku']) els['product-edit-sku'].value = p.sku;
         if (els['product-edit-barcode']) els['product-edit-barcode'].value = p.barcode || '';
         if (els['product-edit-category']) els['product-edit-category'].value = p.category || '';
+        if (els['product-edit-brand']) els['product-edit-brand'].value = p.brand || '';
+        if (els['product-edit-supplier']) els['product-edit-supplier'].value = p.supplier || '';
         if (els['product-edit-buy']) els['product-edit-buy'].value = p.buyPrice;
         if (els['product-edit-sell']) els['product-edit-sell'].value = p.sellPrice;
         if (els['product-edit-stock']) els['product-edit-stock'].value = p.stock;
@@ -342,6 +460,8 @@
         if (els['product-edit-sku']) els['product-edit-sku'].value = '';
         if (els['product-edit-barcode']) els['product-edit-barcode'].value = '';
         if (els['product-edit-category']) els['product-edit-category'].value = '';
+        if (els['product-edit-brand']) els['product-edit-brand'].value = '';
+        if (els['product-edit-supplier']) els['product-edit-supplier'].value = '';
         if (els['product-edit-buy']) els['product-edit-buy'].value = '';
         if (els['product-edit-sell']) els['product-edit-sell'].value = '';
         if (els['product-edit-stock']) els['product-edit-stock'].value = '';
@@ -376,6 +496,8 @@
         const sku = (els['product-edit-sku'] && els['product-edit-sku'].value || '').trim();
         const barcode = (els['product-edit-barcode'] && els['product-edit-barcode'].value || '').trim();
         const category = (els['product-edit-category'] && els['product-edit-category'].value || '').trim();
+        const brand = (els['product-edit-brand'] && els['product-edit-brand'].value || '').trim();
+        const supplier = (els['product-edit-supplier'] && els['product-edit-supplier'].value || '').trim();
         const buy = (UTILS && typeof UTILS.parseMoneyInput === 'function') ? UTILS.parseMoneyInput(els['product-edit-buy'] && els['product-edit-buy'].value) : parseFloat(els['product-edit-buy'] && els['product-edit-buy'].value || '0');
         const sell = (UTILS && typeof UTILS.parseMoneyInput === 'function') ? UTILS.parseMoneyInput(els['product-edit-sell'] && els['product-edit-sell'].value) : parseFloat(els['product-edit-sell'] && els['product-edit-sell'].value || '0');
         const stock = parseInt(els['product-edit-stock'] && els['product-edit-stock'].value || '0', 10);
@@ -398,9 +520,9 @@
         }
 
         if (product) {
-            product.name = name; product.sku = sku; product.barcode = barcode; product.category = category; product.buyPrice = buy; product.sellPrice = sell; product.stock = stock; product.lowStockAt = low;
+            product.name = name; product.sku = sku; product.barcode = barcode; product.category = category; product.brand = brand; product.supplier = supplier; product.buyPrice = buy; product.sellPrice = sell; product.stock = stock; product.lowStockAt = low;
         } else {
-            product = { id: 'p' + (db.products.length + 1), name, sku, barcode, category, buyPrice: buy, sellPrice: sell, stock, lowStockAt: low, createdAt: new Date().toISOString() };
+            product = { id: 'p' + (db.products.length + 1), name, sku, barcode, category, brand, supplier, buyPrice: buy, sellPrice: sell, stock, lowStockAt: low, createdAt: new Date().toISOString() };
             db.products.push(product);
         }
 
@@ -442,7 +564,10 @@
         loadProductToForm,
         clearProductForm,
         saveProductFromForm,
-        focusProductSearch
+        focusProductSearch,
+        updateCategorySuggestions,
+        updateBrandSuggestions,
+        updateSupplierSuggestions
     };
 
 })();
