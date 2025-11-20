@@ -15,6 +15,17 @@
         }
         return ns.elements[id] || null;
     }
+    
+    // For static elements - uses cached lookup via ui.getElement()
+    function _getEl(id) {
+        const UI = ns.ui || {};
+        return (UI && typeof UI.getElement === 'function') ? UI.getElement(id) : getCachedElement(id);
+    }
+    
+    // For dynamic elements - always fresh lookup, no caching
+    function _getById(id) {
+        return document.getElementById(id);
+    }
 
     function syncCartEmptyState(hasItems) {
         const itemCount = ns.state.currentSale && Array.isArray(ns.state.currentSale.items)
@@ -53,6 +64,26 @@
         };
     };
 
+    // Initialize default receipt size from settings
+    ns.pos.initReceiptSize = function () {
+        const settings = ns.state.db?.settings || {};
+        const defaultPrintSize = settings.defaultPrintSize || 'a4';
+        const receiptSizeEl = _getEl('receipt-size');
+        if (receiptSizeEl) {
+            receiptSizeEl.value = defaultPrintSize;
+        };
+    };
+
+    // Initialize default receipt size from settings
+    ns.pos.initReceiptSize = function () {
+        const settings = ns.state.db?.settings || {};
+        const defaultPrintSize = settings.defaultPrintSize || 'a4';
+        const receiptSizeEl = _getEl('receipt-size');
+        if (receiptSizeEl) {
+            receiptSizeEl.value = defaultPrintSize;
+        }
+    };
+
     ns.pos.startNewSale = function (notify) {
         // Check for auto-saved sale first
         if (!notify && ns.pos.recoverAutoSavedSale && ns.pos.recoverAutoSavedSale()) {
@@ -62,20 +93,56 @@
         ns.state.currentSale = ns.pos.createEmptySale();
         ns.state.currentSale.customer = null;
         const els = ns.elements || {};
-        if (els['input-discount']) els['input-discount'].value = '0';
-        if (els['input-payment']) els['input-payment'].value = '0';
-        if (els['cart-table-body']) els['cart-table-body'].innerHTML = '';
+        if (_getEl('input-discount')) _getEl('input-discount').value = '0';
+        if (_getEl('input-payment')) _getEl('input-payment').value = '0';
+        if (_getEl('cart-table-body')) _getEl('cart-table-body').innerHTML = '';
+        
+        // Properly sync cart UI state
         syncCartEmptyState(false);
-        if (els['summary-sale-status']) els['summary-sale-status'].textContent = 'New';
-        if (els['summary-sale-id-value']) els['summary-sale-id-value'].textContent = 'New';
+        
+        // Load default print size from global settings
+        const settings = ns.state.db?.settings || {};
+        const defaultPrintSize = settings.defaultPrintSize || 'a4';
+        if (_getEl('receipt-size')) _getEl('receipt-size').value = defaultPrintSize;
+        
+        if (_getEl('summary-sale-status')) _getEl('summary-sale-status').textContent = 'New Sale';
+        if (_getEl('summary-sale-id-value')) _getEl('summary-sale-id-value').textContent = 'New';
+        
+        // Update action buttons visibility
+        ns.pos.updateActionButtonsVisibility();
+        
         if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip();
         if (ns.pos.renderCartTable) ns.pos.renderCartTable();
         if (ns.pos.updateSaleTotals) ns.pos.updateSaleTotals();
         if (notify && ns.ui && typeof ns.ui.showToast === 'function') ns.ui.showToast('New sale', 'Started a new sale.', 'success');
-        if (els['product-search']) { els['product-search'].focus();}
+        if (_getEl('product-search')) { _getEl('product-search').focus();}
         
         // Clear any auto-save when explicitly starting new sale
         if (notify && ns.pos.clearAutoSave) ns.pos.clearAutoSave();
+    };
+
+    ns.pos.updateActionButtonsVisibility = function () {
+        const hasItems = ns.state.currentSale && Array.isArray(ns.state.currentSale.items) && ns.state.currentSale.items.length > 0;
+        const hasSaleId = ns.state.currentSale && ns.state.currentSale.id;
+        
+        const btnNew = _getEl('btn-new-sale');
+        const btnHold = _getEl('btn-hold-sale');
+        const btnCancel = _getEl('btn-cancel-sale');
+        
+        if (btnNew) {
+            // Show New Sale button always
+            btnNew.style.display = 'flex';
+        }
+        
+        if (btnHold) {
+            // Show Hold button only when there are items
+            btnHold.style.display = hasItems ? 'flex' : 'none';
+        }
+        
+        if (btnCancel) {
+            // Show Cancel button when there's a sale ID (open/editing) or items in cart
+            btnCancel.style.display = (hasSaleId || hasItems) ? 'flex' : 'none';
+        }
     };
 
     ns.pos.clearCart = function () {
@@ -110,44 +177,38 @@
         ns.state.currentSale.total = Math.max(0, subtotal - (ns.state.currentSale.discount || 0));
         ns.state.currentSale.change = Math.max(0, (ns.state.currentSale.payment || 0) - ns.state.currentSale.total);
         ns.state.currentSale.updatedAt = new Date().toISOString();
-        console.log('[updateSaleTotals MODULE] After calculations:');
-        console.log('  - subtotal:', subtotal);
-        console.log('  - total:', ns.state.currentSale.total);
-        console.log('  - payment:', ns.state.currentSale.payment);
-        console.log('  - change:', ns.state.currentSale.change);
         
         // Auto-save current sale to localStorage for recovery after refresh
         ns.pos.autoSaveCurrentSale();
 
         const els = ns.elements || {};
         const formatMoney = (v) => ns.utils && ns.utils.formatMoney ? ns.utils.formatMoney(v) : ('৳ ' + Number(v || 0).toFixed(2));
-        if (els['summary-subtotal']) els['summary-subtotal'].textContent = formatMoney(subtotal);
-        if (els['summary-total']) els['summary-total'].textContent = formatMoney(ns.state.currentSale.total);
-        if (els['sale-header-total']) els['sale-header-total'].textContent = formatMoney(ns.state.currentSale.total);
-        if (els['summary-items-count']) els['summary-items-count'].textContent = String(ns.state.currentSale.items.reduce((s, it) => s + it.qty, 0));
-        if (els['summary-change']) els['summary-change'].textContent = formatMoney(ns.state.currentSale.change);
+        if (_getEl('summary-subtotal')) _getEl('summary-subtotal').textContent = formatMoney(subtotal);
+        if (_getEl('summary-total')) _getEl('summary-total').textContent = formatMoney(ns.state.currentSale.total);
+        if (_getEl('sale-header-total')) _getEl('sale-header-total').textContent = formatMoney(ns.state.currentSale.total);
+        if (_getEl('summary-items-count')) _getEl('summary-items-count').textContent = String(ns.state.currentSale.items.reduce((s, it) => s + it.qty, 0));
+        if (_getEl('summary-change')) _getEl('summary-change').textContent = formatMoney(ns.state.currentSale.change);
         
         // Update discount percentage
-        if (getElement('discount-percentage')) {
-            console.log('[updateSaleTotals MODULE] Updating discount percentage display');
+        if (_getEl('discount-percentage')) {
             const discountPercent = subtotal > 0 ? ((ns.state.currentSale.discount / subtotal) * 100).toFixed(1) : 0;
-            els['discount-percentage'].textContent = `${discountPercent}%`;
+            _getEl('discount-percentage').textContent = `${discountPercent}%`;
         }
         
         // Only update input fields if user is not actively editing them
         try {
             const active = document.activeElement;
-            if (els['input-discount'] && active !== els['input-discount']) els['input-discount'].value = ns.state.currentSale.discount || 0;
-            if (els['input-payment'] && active !== els['input-payment']) els['input-payment'].value = ns.state.currentSale.payment || 0;
+            if (_getEl('input-discount') && active !== _getEl('input-discount')) _getEl('input-discount').value = ns.state.currentSale.discount || 0;
+            if (_getEl('input-payment') && active !== _getEl('input-payment')) _getEl('input-payment').value = ns.state.currentSale.payment || 0;
         } catch (e) {
-            if (els['input-discount']) els['input-discount'].value = ns.state.currentSale.discount || 0;
-            if (els['input-payment']) els['input-payment'].value = ns.state.currentSale.payment || 0;
+            if (_getEl('input-discount')) _getEl('input-discount').value = ns.state.currentSale.discount || 0;
+            if (_getEl('input-payment')) _getEl('input-payment').value = ns.state.currentSale.payment || 0;
         }
     };
 
     ns.pos.renderCartTable = function () {
         const els = ns.elements || {};
-        const tbody = els['cart-table-body'];
+        const tbody = _getEl('cart-table-body');
         if (!tbody) return;
         tbody.innerHTML = '';
 
@@ -179,6 +240,7 @@
         });
 
         ns.pos.updateSaleTotals();
+        ns.pos.updateActionButtonsVisibility();
     };
 
     ns.pos.changeCartQty = function (index, delta) {
@@ -262,17 +324,40 @@
                     // Update sale status and ID display for editing mode
                     const els = ns.elements || {};
                     if (sale.id) {
-                        if (els['summary-sale-status']) {
-                            const statusText = sale.status === 'closed' ? 'Closed' : (sale.status === 'open' ? 'Open' : 'Editing');
-                            els['summary-sale-status'].textContent = `${statusText} · ${sale.id}`;
+                        if (_getEl('summary-sale-status')) {
+                            const statusText = sale.status === 'closed' ? 'Editing Closed Sale' : (sale.status === 'open' ? 'Editing Open Sale' : 'Editing Sale');
+                            _getEl('summary-sale-status').textContent = `${statusText} · ${sale.id}`;
                         }
-                        if (els['summary-sale-id-value']) {
-                            els['summary-sale-id-value'].textContent = sale.id;
+                        if (_getEl('summary-sale-id-value')) {
+                            _getEl('summary-sale-id-value').textContent = sale.id;
                         }
+                    } else {
+                        if (_getEl('summary-sale-status')) _getEl('summary-sale-status').textContent = 'New Sale';
+                        if (_getEl('summary-sale-id-value')) _getEl('summary-sale-id-value').textContent = 'New';
                     }
+                    
+                    // Ensure cart UI state is properly synced
+                    const hasItems = sale.items && sale.items.length > 0;
+                    syncCartEmptyState(hasItems);
+                    
+                    // Initialize receipt size from settings
+                    if (ns.pos.initReceiptSize) ns.pos.initReceiptSize();
                     
                     if (ns.pos.renderCartTable) ns.pos.renderCartTable();
                     if (ns.pos.updateSaleTotals) ns.pos.updateSaleTotals();
+                    if (ns.pos.updateActionButtonsVisibility) ns.pos.updateActionButtonsVisibility();
+                    
+                    // Force update cart count chip after DOM is ready
+                    setTimeout(() => {
+                        const itemCount = sale.items.reduce((sum, it) => sum + (it.qty || 0), 0);
+                        const countChip = _getEl('cart-count-chip');
+                        
+                        if (countChip && itemCount > 0) {
+                            countChip.textContent = `${itemCount} item${itemCount === 1 ? '' : 's'}`;
+                            countChip.classList.remove('hidden');
+                        }
+                    }, 100);
+                    
                     if (ns.ui) ns.ui.showToast('Sale recovered', 'Previous sale restored after refresh.', 'success');
                     return true;
                 }
@@ -291,6 +376,58 @@
         } catch (e) {
             console.error('Clear auto-save failed:', e);
         }
+    };
+
+    // Load an open sale for editing
+    ns.pos.loadOpenSale = function (saleId) {
+        const sale = ns.state.db.sales.find(s => s.id === saleId);
+        if (!sale) {
+            if (ns.ui) ns.ui.showToast('Load sale', 'Sale not found.', 'error');
+            return;
+        }
+
+        const activeSaleId = ns.state.currentSale && ns.state.currentSale.id ? ns.state.currentSale.id : null;
+        const activeHasItems = ns.state.currentSale && Array.isArray(ns.state.currentSale.items) && ns.state.currentSale.items.length > 0;
+        
+        // If already editing this sale, just switch to sale tab
+        if (activeSaleId === saleId) {
+            if (window.switchTab) window.switchTab('tab-sale');
+            if (ns.ui) ns.ui.showToast('Load sale', `Sale ${saleId} is already loaded.`, 'info');
+            return;
+        }
+
+        // If there's a different sale with items, ask to save it first
+        if (activeHasItems && activeSaleId && activeSaleId !== saleId) {
+            if (!confirm(`Save current sale ${activeSaleId} before loading ${saleId}?`)) {
+                return;
+            }
+            // Hold the current sale
+            if (ns.pos.holdCurrentSale) ns.pos.holdCurrentSale();
+        }
+
+        // Load the sale
+        ns.state.currentSale = ns.utils ? ns.utils.structuredClone(sale) : JSON.parse(JSON.stringify(sale));
+        
+        // Restore customer
+        if (sale.customer && window.LitePos.customers && typeof window.LitePos.customers.setCurrentCustomer === 'function') {
+            window.LitePos.customers.setCurrentCustomer(sale.customer);
+        }
+        
+        // Update UI
+        const statusLabel = sale.status === 'closed' ? 'Editing Closed Sale' : (sale.status === 'open' ? 'Editing Open Sale' : 'Editing Sale');
+        if (_getEl('summary-sale-status')) _getEl('summary-sale-status').textContent = `${statusLabel} · ${sale.id}`;
+        if (_getEl('summary-sale-id-value')) _getEl('summary-sale-id-value').textContent = sale.id;
+        
+        // Render and update
+        if (ns.pos.renderCartTable) ns.pos.renderCartTable();
+        if (ns.pos.updateSaleTotals) ns.pos.updateSaleTotals();
+        if (ns.pos.updateActionButtonsVisibility) ns.pos.updateActionButtonsVisibility();
+        
+        // Switch to sale tab and focus
+        if (window.switchTab) window.switchTab('tab-sale');
+        if (ns.pos.focusProductSearch) ns.pos.focusProductSearch();
+        
+        if (ns.ui) ns.ui.showToast('Sale loaded', `Editing sale ${sale.id}.`, 'success');
     };
 
     ns.pos.holdCurrentSale = function () {
@@ -329,23 +466,30 @@
     };
 
     ns.pos.cancelCurrentSale = function () {
+        const hasItems = ns.state.currentSale && Array.isArray(ns.state.currentSale.items) && ns.state.currentSale.items.length > 0;
+        
+        // If cart has items, ask for confirmation
+        if (hasItems && !confirm('Discard cart items and cancel sale?')) {
+            return;
+        }
+        
         if (!ns.state.currentSale || !ns.state.currentSale.id) { 
             if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
-            ns.pos.startNewSale(true); 
+            ns.pos.startNewSale(false); 
             if (ns.ui) ns.ui.showToast('Sale cleared', 'Cancelled unsaved sale.', 'success'); 
             return; 
         }
         const idx = ns.state.db.sales.findIndex(s => s.id === ns.state.currentSale.id && s.status === 'open');
         if (idx === -1) { 
             if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
-            ns.pos.startNewSale(true); 
+            ns.pos.startNewSale(false); 
             return; 
         }
         if (!confirm(`Cancel open sale ${ns.state.currentSale.id}? It will be removed.`)) return;
         ns.state.db.sales.splice(idx, 1);
         if (ns.api && typeof ns.api.saveDb === 'function') ns.api.saveDb(); else localStorage.setItem(ns.api && ns.api.DB_KEY ? ns.api.DB_KEY : 'litepos_bdt_db_v1', JSON.stringify(ns.state.db));
         if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
-        ns.pos.startNewSale(true); 
+        ns.pos.startNewSale(false); 
         if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip(); 
         if (ns.ui) ns.ui.showToast('Sale cancelled', 'Open sale removed.', 'success');
     };
@@ -383,13 +527,161 @@
         if (ns.pos.renderTodaySnapshot) ns.pos.renderTodaySnapshot && ns.pos.renderTodaySnapshot();
     };
 
+    // Fill receipt with sale data
+    ns.pos.fillReceiptFromSale = function (sale) {
+        console.log('[fillReceiptFromSale] Called with sale:', sale);
+        if (!sale) {
+            console.error('[fillReceiptFromSale] No sale provided!');
+            return;
+        }
+        
+        const formatMoney = (v) => ns.utils && ns.utils.formatMoney ? ns.utils.formatMoney(v) : ('৳ ' + Number(v || 0).toFixed(2));
+        
+        // Determine which template to use
+        const settings = ns.state.db.settings || {};
+        const template = settings.defaultPrintTemplate || 'standard';
+        const isCompact = template === 'compact';
+        
+        // Shop details - fill both templates
+        const shopName = _getEl(isCompact ? 'receipt-shop-name-compact' : 'receipt-shop-name');
+        const shopAddress = _getEl(isCompact ? 'receipt-shop-address-compact' : 'receipt-shop-address');
+        const shopPhone = _getEl(isCompact ? 'receipt-shop-phone-compact' : 'receipt-shop-phone');
+        const logoEl = _getEl(isCompact ? 'receipt-logo-compact' : 'receipt-logo-standard');
+        
+        console.log('[fillReceiptFromSale] Shop elements:', { shopName, shopAddress, shopPhone, logoEl });
+        
+        if (shopName) shopName.textContent = ns.state.db.shop?.name || 'LitePOS';
+        if (shopAddress) shopAddress.textContent = ns.state.db.shop?.address || '';
+        if (shopPhone) shopPhone.textContent = ns.state.db.shop?.phone || '';
+        
+        // Display logo if available
+        if (logoEl && ns.state.db.shop?.logo) {
+            logoEl.src = ns.state.db.shop.logo;
+            logoEl.style.display = 'block';
+        } else if (logoEl) {
+            logoEl.style.display = 'none';
+        }
+        
+        // Sale metadata
+        const saleMeta = _getEl(isCompact ? 'receipt-sale-meta-compact' : 'receipt-sale-meta');
+        if (saleMeta) {
+            const date = new Date(sale.createdAt || sale.updatedAt || new Date());
+            const dateStr = date.toLocaleDateString();
+            const timeStr = date.toLocaleTimeString();
+            const customerName = sale.customer?.name || 'Walk-in';
+            const salesperson = ns.state.db.users?.find(u => u.id === sale.salespersonId);
+            
+            saleMeta.innerHTML = `
+                <div><strong>Sale ID:</strong> ${sale.id || 'N/A'}</div>
+                <div><strong>Date:</strong> ${dateStr} ${timeStr}</div>
+                <div><strong>Customer:</strong> ${customerName}</div>
+                ${salesperson ? `<div><strong>Salesperson:</strong> ${salesperson.name}</div>` : ''}
+            `;
+            console.log('[fillReceiptFromSale] Sale meta filled:', saleMeta.innerHTML);
+        }
+        
+        // Items table
+        const itemsBody = _getEl(isCompact ? 'receipt-items-body-compact' : 'receipt-items-body');
+        console.log('[fillReceiptFromSale] Items body element:', itemsBody, 'Items count:', sale.items?.length);
+        if (itemsBody) {
+            itemsBody.innerHTML = '';
+            (sale.items || []).forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.qty}</td>
+                    <td>${formatMoney(item.price)}</td>
+                    <td>${formatMoney(item.qty * item.price)}</td>
+                `;
+                itemsBody.appendChild(tr);
+            });
+            console.log('[fillReceiptFromSale] Items filled. Row count:', itemsBody.children.length);
+        }
+        
+        // Totals
+        const suffix = isCompact ? '-compact' : '';
+        if (_getEl('receipt-subtotal' + suffix)) _getEl('receipt-subtotal' + suffix).textContent = formatMoney(sale.subtotal || 0);
+        if (_getEl('receipt-discount' + suffix)) _getEl('receipt-discount' + suffix).textContent = formatMoney(sale.discount || 0);
+        if (_getEl('receipt-total' + suffix)) _getEl('receipt-total' + suffix).textContent = formatMoney(sale.total || 0);
+        if (_getEl('receipt-payment' + suffix)) _getEl('receipt-payment' + suffix).textContent = formatMoney(sale.payment || 0);
+        if (_getEl('receipt-change' + suffix)) _getEl('receipt-change' + suffix).textContent = formatMoney(sale.change || 0);
+        
+        console.log('[fillReceiptFromSale] Receipt filled successfully');
+    };
+    
+    // Print last receipt
+    ns.pos.printLastReceipt = function () {
+        console.log('[printLastReceipt] Starting...');
+        let saleId = ns.state.lastClosedSaleId;
+        console.log('[printLastReceipt] lastClosedSaleId:', saleId);
+        
+        if (!saleId) {
+            // Find the most recent closed sale
+            const closedSales = ns.state.db.sales.filter(s => s.status === 'closed');
+            console.log('[printLastReceipt] Found closed sales:', closedSales.length);
+            if (closedSales.length === 0) {
+                if (ns.ui) ns.ui.showToast('Print', 'No closed sale to print.', 'error');
+                return;
+            }
+            closedSales.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+            saleId = closedSales[0].id;
+            console.log('[printLastReceipt] Using most recent closed sale:', saleId);
+        }
+        
+        const sale = ns.state.db.sales.find(s => s.id === saleId);
+        console.log('[printLastReceipt] Found sale:', sale);
+        if (!sale) {
+            if (ns.ui) ns.ui.showToast('Print', 'Last sale not found.', 'error');
+            return;
+        }
+        
+        // Fill receipt
+        ns.pos.fillReceiptFromSale(sale);
+        
+        // Get settings from UI dropdown and global settings
+        const settings = ns.state.db.settings || {};
+        const template = settings.defaultPrintTemplate || 'standard';
+        // Use the selected value from receipt-size dropdown, not global settings
+        const receiptSizeEl = _getEl('receipt-size');
+        const size = (receiptSizeEl && receiptSizeEl.value) || 'a4';
+        console.log('[printLastReceipt] Template:', template, 'Size:', size);
+        
+        // Show/hide templates
+        const standardTemplate = _getEl('receipt-standard');
+        const compactTemplate = _getEl('receipt-compact');
+        if (standardTemplate) standardTemplate.style.display = (template === 'standard') ? 'block' : 'none';
+        if (compactTemplate) compactTemplate.style.display = (template === 'compact') ? 'block' : 'none';
+        
+        // Add print classes
+        document.body.classList.add('print-receipt');
+        document.body.classList.add(
+            size === '80mm' ? 'receipt-80mm' :
+            size === '58mm' ? 'receipt-58mm' : 'receipt-a4'
+        );
+        
+        console.log('[printLastReceipt] Added body classes:', document.body.className);
+        console.log('[printLastReceipt] Receipt element display:', getComputedStyle(_getEl('receipt-print')).display);
+        
+        // Print
+        setTimeout(() => {
+            console.log('[printLastReceipt] Calling window.print()');
+            window.print();
+        }, 200);
+        
+        // Cleanup after print
+        setTimeout(() => {
+            document.body.classList.remove('print-receipt', 'receipt-a4', 'receipt-80mm', 'receipt-58mm');
+            console.log('[printLastReceipt] Cleanup done');
+        }, 1000);
+    };
+
     // expose some helpers used by other modules
+    ns.pos.initReceiptSize = ns.pos.initReceiptSize || function () {};
     ns.pos.renderOpenSalesStrip = ns.pos.renderOpenSalesStrip || function () {};
     ns.pos.renderProductsTable = ns.pos.renderProductsTable || function () {};
     ns.pos.renderCustomersTable = ns.pos.renderCustomersTable || function () {};
     ns.pos.refreshKpis = ns.pos.refreshKpis || function () {};
     ns.pos.renderSalesTable = ns.pos.renderSalesTable || function () {};
-    ns.pos.fillReceiptFromSale = ns.pos.fillReceiptFromSale || function () {};
     ns.pos.renderTodaySnapshot = ns.pos.renderTodaySnapshot || function () {};
 
 })();

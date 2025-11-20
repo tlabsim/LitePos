@@ -13,6 +13,14 @@
 
     function _getDb() { return state.db || (window.db || {}); }
     function _getEls() { return window.LitePos.elements || {}; }
+    // For static elements - uses cached lookup via ui.getElement()
+    function _getEl(id) { 
+        return (UI && typeof UI.getElement === 'function') ? UI.getElement(id) : document.getElementById(id); 
+    }
+    // For dynamic elements - always fresh lookup, no caching (elements may be destroyed/recreated)
+    function _getById(id) {
+        return document.getElementById(id);
+    }
     function _showToast(title, msg, type) {
         if (UI && typeof UI.showToast === 'function') return UI.showToast(title, msg, type);
         if (typeof window.showToast === 'function') return window.showToast(title, msg, type);
@@ -45,8 +53,8 @@
     function _addToCartAndMaybeClose(sku) {
         _addToCart(sku);
         const els = _getEls();
-        const overlay = els['product-overlay'];
-        const toggle = els['toggle-all-products'];
+        const overlay = _getById('product-overlay');
+        const toggle = _getEl('toggle-all-products');
         let showAll = false;
         if (toggle) {
             if (toggle.tagName === 'INPUT') showAll = !!toggle.checked;
@@ -54,7 +62,7 @@
         }
         if (overlay && !showAll) overlay.classList.add('hidden');
 
-        const search = els['product-search'];
+        const search = _getEl('product-search');
         if (search) {
             const hadValue = search.value !== '';
             search.value = '';
@@ -69,16 +77,16 @@
     function renderProductsTable() {
         const els = _getEls();
         const db = _getDb();
-        const tbody = els['products-table-body'];
+        const tbody = _getEl('products-table-body');
         if (!tbody) return;
         tbody.innerHTML = '';
         
-        const query = (els['product-manage-search'] && els['product-manage-search'].value || '').trim().toLowerCase();
-        const categoryFilter = els['product-filter-category'] ? els['product-filter-category'].value : '';
-        const brandFilter = els['product-filter-brand'] ? els['product-filter-brand'].value : '';
-        const supplierFilter = els['product-filter-supplier'] ? els['product-filter-supplier'].value : '';
-        const lowStockOnly = els['product-filter-low-stock'] ? els['product-filter-low-stock'].checked : false;
-        const sortBy = els['product-sort'] ? els['product-sort'].value : 'name-asc';
+        const query = (_getEl('product-manage-search') && _getEl('product-manage-search').value || '').trim().toLowerCase();
+        const categoryFilter = _getEl('product-filter-category') ? _getEl('product-filter-category').value : '';
+        const brandFilter = _getEl('product-filter-brand') ? _getEl('product-filter-brand').value : '';
+        const supplierFilter = _getEl('product-filter-supplier') ? _getEl('product-filter-supplier').value : '';
+        const lowStockOnly = _getEl('product-filter-low-stock') ? _getEl('product-filter-low-stock').checked : false;
+        const sortBy = _getEl('product-sort') ? _getEl('product-sort').value : 'name-asc';
 
         let allProducts = (db.products || []).slice();
         
@@ -133,28 +141,28 @@
         });
         
         // Update badge with total product count (always show all products)
-        if (els['product-count-badge']) {
-            els['product-count-badge'].textContent = `${allProducts.length} products`;
+        if (_getEl('product-count-badge')) {
+            _getEl('product-count-badge').textContent = `${allProducts.length} products`;
         }
         
         // Update pagination text with filtered count
         const totalFiltered = filtered.length;
-        if (els['product-total-count']) {
+        if (_getEl('product-total-count')) {
             if (lowStockOnly && totalFiltered === 0) {
-                els['product-total-count'].textContent = 'No low stock items';
+                _getEl('product-total-count').textContent = 'No low stock items';
             } else if (lowStockOnly) {
-                els['product-total-count'].textContent = `${totalFiltered} low stock ${totalFiltered === 1 ? 'item' : 'items'} | Showing page 1 of 1`;
+                _getEl('product-total-count').textContent = `${totalFiltered} low stock ${totalFiltered === 1 ? 'item' : 'items'} | Showing page 1 of 1`;
             } else {
-                els['product-total-count'].textContent = `${totalFiltered} total | Showing page 1 of 1`;
+                _getEl('product-total-count').textContent = `${totalFiltered} total | Showing page 1 of 1`;
             }
         }
         
         // Disable/enable pagination buttons (no pagination in module version for now)
-        if (els['btn-product-prev-page']) {
-            els['btn-product-prev-page'].disabled = true;
+        if (_getEl('btn-product-prev-page')) {
+            _getEl('btn-product-prev-page').disabled = true;
         }
-        if (els['btn-product-next-page']) {
-            els['btn-product-next-page'].disabled = true;
+        if (_getEl('btn-product-next-page')) {
+            _getEl('btn-product-next-page').disabled = true;
         }
         
         // Render filtered products
@@ -172,6 +180,8 @@
             
             const tdName = document.createElement('td'); 
             tdName.textContent = p.name; 
+            tdName.style.fontSize = '14px';
+            tdName.style.fontWeight = '600';
             tr.appendChild(tdName);
             
             const tdSku = document.createElement('td'); 
@@ -229,66 +239,66 @@
     function updateCategoryDropdown() {
         const els = _getEls();
         const db = _getDb();
-        if (!els['product-filter-category']) return;
+        if (!_getEl('product-filter-category')) return;
         
         const categories = [...new Set(db.products.map(p => p.category).filter(c => c))].sort();
-        const currentValue = els['product-filter-category'].value;
+        const currentValue = _getEl('product-filter-category').value;
         
-        els['product-filter-category'].innerHTML = '<option value="">All Categories</option>';
+        _getEl('product-filter-category').innerHTML = '<option value="">All Categories</option>';
         categories.forEach(cat => {
             const opt = document.createElement('option');
             opt.value = cat;
             opt.textContent = cat;
-            els['product-filter-category'].appendChild(opt);
+            _getEl('product-filter-category').appendChild(opt);
         });
         
         // Restore selected value if it still exists
         if (currentValue && categories.includes(currentValue)) {
-            els['product-filter-category'].value = currentValue;
+            _getEl('product-filter-category').value = currentValue;
         }
     }
 
     function updateBrandDropdown() {
         const els = _getEls();
         const db = _getDb();
-        if (!els['product-filter-brand']) return;
+        if (!_getEl('product-filter-brand')) return;
         
         const brands = [...new Set(db.products.map(p => p.brand).filter(b => b))].sort();
-        const currentValue = els['product-filter-brand'].value;
+        const currentValue = _getEl('product-filter-brand').value;
         
-        els['product-filter-brand'].innerHTML = '<option value="">All Brands</option>';
+        _getEl('product-filter-brand').innerHTML = '<option value="">All Brands</option>';
         brands.forEach(brand => {
             const opt = document.createElement('option');
             opt.value = brand;
             opt.textContent = brand;
-            els['product-filter-brand'].appendChild(opt);
+            _getEl('product-filter-brand').appendChild(opt);
         });
         
         // Restore selected value if it still exists
         if (currentValue && brands.includes(currentValue)) {
-            els['product-filter-brand'].value = currentValue;
+            _getEl('product-filter-brand').value = currentValue;
         }
     }
 
     function updateSupplierDropdown() {
         const els = _getEls();
         const db = _getDb();
-        if (!els['product-filter-supplier']) return;
+        if (!_getEl('product-filter-supplier')) return;
         
         const suppliers = [...new Set(db.products.map(p => p.supplier).filter(s => s))].sort();
-        const currentValue = els['product-filter-supplier'].value;
+        const currentValue = _getEl('product-filter-supplier').value;
         
-        els['product-filter-supplier'].innerHTML = '<option value="">All Suppliers</option>';
+        _getEl('product-filter-supplier').innerHTML = '<option value="">All Suppliers</option>';
         suppliers.forEach(supplier => {
             const opt = document.createElement('option');
             opt.value = supplier;
             opt.textContent = supplier;
-            els['product-filter-supplier'].appendChild(opt);
+            _getEl('product-filter-supplier').appendChild(opt);
         });
         
         // Restore selected value if it still exists
         if (currentValue && suppliers.includes(currentValue)) {
-            els['product-filter-supplier'].value = currentValue;
+            _getEl('product-filter-supplier').value = currentValue;
         }
     }
 
@@ -340,12 +350,12 @@
     function renderProductSearchTable() {
         const els = _getEls();
         const db = _getDb();
-        const overlayBody = els['product-overlay-body'];
-        const tbody = overlayBody || els['product-table-body'];
+        const overlayBody = _getById('product-overlay-body');
+        const tbody = overlayBody || _getEl('product-table-body');
         if (!tbody) return;
         tbody.innerHTML = '';
-        const query = (els['product-search'] && els['product-search'].value || '').trim().toLowerCase();
-        const toggleEl = els['toggle-all-products'];
+        const query = (_getEl('product-search') && _getEl('product-search').value || '').trim().toLowerCase();
+        const toggleEl = _getEl('toggle-all-products');
         let showAll = false;
         if (toggleEl) {
             if (toggleEl.tagName === 'INPUT') showAll = !!toggleEl.checked;
@@ -359,8 +369,26 @@
             return text.includes(query);
         });
 
+        // Ensure table structure exists for product overlay
+        if (_getById('product-overlay') && filtered.length > 0) {
+            const overlay = _getById('product-overlay');
+            const overlayInner = overlay.querySelector('.product-overlay-inner');
+            if (overlayInner && !overlayInner.querySelector('table')) {
+                overlayInner.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr><th>Product</th><th>SKU</th><th>Barcode</th><th>Category</th><th>Sell</th><th>Stock</th><th></th></tr>
+                        </thead>
+                        <tbody id="product-overlay-body"></tbody>
+                    </table>
+                `;
+            }
+        }
+
         filtered.forEach((p, idx) => {
             const tr = document.createElement('tr');
+            tr.dataset.sku = p.sku;
+            tr.dataset.index = idx;
             tr.addEventListener('click', () => _addToCartAndMaybeClose(p.sku));
 
             const tdName = document.createElement('td'); tdName.textContent = p.name; tr.appendChild(tdName);
@@ -379,10 +407,28 @@
         });
 
         // If rendering into the overlay, control overlay visibility
-        if (els['product-overlay']) {
-            const overlay = els['product-overlay'];
-            if (query.length > 0 || showAll) overlay.classList.remove('hidden');
-            else overlay.classList.add('hidden');
+        if (_getById('product-overlay')) {
+            const overlay = _getById('product-overlay');
+            if (query.length > 0 || showAll) {
+                overlay.classList.remove('hidden');
+                // Show empty state if no results
+                if (filtered.length === 0) {
+                    const overlayInner = overlay.querySelector('.product-overlay-inner');
+                    if (overlayInner) {
+                        overlayInner.innerHTML = `
+                            <div style="padding: 40px 20px; text-align: center; color: var(--text-soft);">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 48px; height: 48px; margin: 0 auto 12px; opacity: 0.5;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                                </svg>
+                                <div style="font-size: 15px; font-weight: 500; margin-bottom: 4px;">No products found</div>
+                                <div style="font-size: 13px; opacity: 0.7;">Try a different search term</div>
+                            </div>
+                        `;
+                    }
+                }
+            } else {
+                overlay.classList.add('hidden');
+            }
 
             // Ensure toggle binds to re-render (support checkbox or button)
             if (toggleEl && !toggleEl._productsToggleBound) {
@@ -399,6 +445,65 @@
                     });
                 }
             }
+
+            // Add keyboard navigation to product search input
+            const searchInput = _getEl('product-search');
+            if (searchInput && !searchInput._keyboardNavBound) {
+                searchInput._keyboardNavBound = true;
+                searchInput.addEventListener('keydown', (ev) => {
+                    const rows = Array.from(overlayBody.querySelectorAll('tr'));
+                    if (rows.length === 0) return;
+
+                    // Enter: add selected or only product
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        const selected = overlayBody.querySelector('tr.selected');
+                        if (selected) {
+                            _addToCartAndMaybeClose(selected.dataset.sku);
+                        } else if (rows.length === 1) {
+                            // If only one result, add it
+                            _addToCartAndMaybeClose(rows[0].dataset.sku);
+                        }
+                        return;
+                    }
+
+                    // Arrow down: select next
+                    if (ev.key === 'ArrowDown') {
+                        ev.preventDefault();
+                        const selected = overlayBody.querySelector('tr.selected');
+                        if (!selected) {
+                            rows[0].classList.add('selected');
+                        } else {
+                            const idx = parseInt(selected.dataset.index);
+                            selected.classList.remove('selected');
+                            if (idx < rows.length - 1) {
+                                rows[idx + 1].classList.add('selected');
+                            } else {
+                                rows[0].classList.add('selected');
+                            }
+                        }
+                        return;
+                    }
+
+                    // Arrow up: select previous
+                    if (ev.key === 'ArrowUp') {
+                        ev.preventDefault();
+                        const selected = overlayBody.querySelector('tr.selected');
+                        if (!selected) {
+                            rows[rows.length - 1].classList.add('selected');
+                        } else {
+                            const idx = parseInt(selected.dataset.index);
+                            selected.classList.remove('selected');
+                            if (idx > 0) {
+                                rows[idx - 1].classList.add('selected');
+                            } else {
+                                rows[rows.length - 1].classList.add('selected');
+                            }
+                        }
+                        return;
+                    }
+                });
+            }
         }
     }
 
@@ -407,39 +512,39 @@
         const db = _getDb();
         const p = db.products.find(pp => pp.id === id);
         if (!p) return;
-        if (els['product-edit-name']) els['product-edit-name'].value = p.name;
-        if (els['product-edit-sku']) els['product-edit-sku'].value = p.sku;
-        if (els['product-edit-barcode']) els['product-edit-barcode'].value = p.barcode || '';
-        if (els['product-edit-category']) els['product-edit-category'].value = p.category || '';
-        if (els['product-edit-brand']) els['product-edit-brand'].value = p.brand || '';
-        if (els['product-edit-supplier']) els['product-edit-supplier'].value = p.supplier || '';
-        if (els['product-edit-buy']) els['product-edit-buy'].value = p.buyPrice;
-        if (els['product-edit-sell']) els['product-edit-sell'].value = p.sellPrice;
-        if (els['product-edit-stock']) els['product-edit-stock'].value = p.stock;
-        if (els['product-edit-low']) els['product-edit-low'].value = p.lowStockAt || 0;
-        if (els['product-edit-name']) els['product-edit-name'].dataset.productId = p.id;
+        if (_getEl('product-edit-name')) _getEl('product-edit-name').value = p.name;
+        if (_getEl('product-edit-sku')) _getEl('product-edit-sku').value = p.sku;
+        if (_getEl('product-edit-barcode')) _getEl('product-edit-barcode').value = p.barcode || '';
+        if (_getEl('product-edit-category')) _getEl('product-edit-category').value = p.category || '';
+        if (_getEl('product-edit-brand')) _getEl('product-edit-brand').value = p.brand || '';
+        if (_getEl('product-edit-supplier')) _getEl('product-edit-supplier').value = p.supplier || '';
+        if (_getEl('product-edit-buy')) _getEl('product-edit-buy').value = p.buyPrice;
+        if (_getEl('product-edit-sell')) _getEl('product-edit-sell').value = p.sellPrice;
+        if (_getEl('product-edit-stock')) _getEl('product-edit-stock').value = p.stock;
+        if (_getEl('product-edit-low')) _getEl('product-edit-low').value = p.lowStockAt || 0;
+        if (_getEl('product-edit-name')) _getEl('product-edit-name').dataset.productId = p.id;
         
         // Disable stock input for existing products
-        if (els['product-edit-stock']) {
-            els['product-edit-stock'].disabled = true;
-            els['product-edit-stock'].style.backgroundColor = 'var(--bg-soft)';
-            els['product-edit-stock'].style.cursor = 'not-allowed';
+        if (_getEl('product-edit-stock')) {
+            _getEl('product-edit-stock').disabled = true;
+            _getEl('product-edit-stock').style.backgroundColor = 'var(--bg-soft)';
+            _getEl('product-edit-stock').style.cursor = 'not-allowed';
         }
         
         // Show stock adjustment card and updates log
-        if (els['stock-adjustment-card']) {
+        if (_getEl('stock-adjustment-card')) {
             console.log('[Module] Showing stock adjustment card for product:', id);
-            els['stock-adjustment-card'].style.display = 'block';
-            if (els['stock-current-value']) {
-                els['stock-current-value'].textContent = p.stock;
+            _getEl('stock-adjustment-card').style.display = 'block';
+            if (_getEl('stock-current-value')) {
+                _getEl('stock-current-value').textContent = p.stock;
             }
-            if (els['stock-adjustment-date']) {
-                els['stock-adjustment-date'].value = new Date().toISOString().split('T')[0];
+            if (_getEl('stock-adjustment-date')) {
+                _getEl('stock-adjustment-date').value = new Date().toISOString().split('T')[0];
             }
         }
-        if (els['stock-updates-card']) {
+        if (_getEl('stock-updates-card')) {
             console.log('[Module] Showing stock updates card for product:', id);
-            els['stock-updates-card'].style.display = 'block';
+            _getEl('stock-updates-card').style.display = 'block';
             if (typeof window.renderStockUpdatesTable === 'function') {
                 console.log('[Module] Calling renderStockUpdatesTable');
                 window.renderStockUpdatesTable(id);
@@ -449,64 +554,64 @@
         }
         
         // Show delete button for existing products
-        if (els['btn-delete-product']) {
-            els['btn-delete-product'].style.display = 'inline-block';
+        if (_getEl('btn-delete-product')) {
+            _getEl('btn-delete-product').style.display = 'inline-block';
         }
     }
 
     function clearProductForm() {
         const els = _getEls();
-        if (els['product-edit-name']) els['product-edit-name'].value = '';
-        if (els['product-edit-sku']) els['product-edit-sku'].value = '';
-        if (els['product-edit-barcode']) els['product-edit-barcode'].value = '';
-        if (els['product-edit-category']) els['product-edit-category'].value = '';
-        if (els['product-edit-brand']) els['product-edit-brand'].value = '';
-        if (els['product-edit-supplier']) els['product-edit-supplier'].value = '';
-        if (els['product-edit-buy']) els['product-edit-buy'].value = '';
-        if (els['product-edit-sell']) els['product-edit-sell'].value = '';
-        if (els['product-edit-stock']) els['product-edit-stock'].value = '';
-        if (els['product-edit-low']) els['product-edit-low'].value = '';
-        if (els['product-edit-name']) delete els['product-edit-name'].dataset.productId;
+        if (_getEl('product-edit-name')) _getEl('product-edit-name').value = '';
+        if (_getEl('product-edit-sku')) _getEl('product-edit-sku').value = '';
+        if (_getEl('product-edit-barcode')) _getEl('product-edit-barcode').value = '';
+        if (_getEl('product-edit-category')) _getEl('product-edit-category').value = '';
+        if (_getEl('product-edit-brand')) _getEl('product-edit-brand').value = '';
+        if (_getEl('product-edit-supplier')) _getEl('product-edit-supplier').value = '';
+        if (_getEl('product-edit-buy')) _getEl('product-edit-buy').value = '';
+        if (_getEl('product-edit-sell')) _getEl('product-edit-sell').value = '';
+        if (_getEl('product-edit-stock')) _getEl('product-edit-stock').value = '';
+        if (_getEl('product-edit-low')) _getEl('product-edit-low').value = '';
+        if (_getEl('product-edit-name')) delete _getEl('product-edit-name').dataset.productId;
         
         // Hide delete button for new products
-        if (els['btn-delete-product']) {
-            els['btn-delete-product'].style.display = 'none';
+        if (_getEl('btn-delete-product')) {
+            _getEl('btn-delete-product').style.display = 'none';
         }
         
         // Re-enable stock input for new products
-        if (els['product-edit-stock']) {
-            els['product-edit-stock'].disabled = false;
-            els['product-edit-stock'].style.backgroundColor = '';
-            els['product-edit-stock'].style.cursor = '';
+        if (_getEl('product-edit-stock')) {
+            _getEl('product-edit-stock').disabled = false;
+            _getEl('product-edit-stock').style.backgroundColor = '';
+            _getEl('product-edit-stock').style.cursor = '';
         }
         
         // Hide stock adjustment and updates cards
-        if (els['stock-adjustment-card']) els['stock-adjustment-card'].style.display = 'none';
-        if (els['stock-updates-card']) els['stock-updates-card'].style.display = 'none';
+        if (_getEl('stock-adjustment-card')) _getEl('stock-adjustment-card').style.display = 'none';
+        if (_getEl('stock-updates-card')) _getEl('stock-updates-card').style.display = 'none';
         
         // Clear stock adjustment form
-        if (els['stock-adjustment-qty']) els['stock-adjustment-qty'].value = '';
-        if (els['stock-adjustment-note']) els['stock-adjustment-note'].value = '';
+        if (_getEl('stock-adjustment-qty')) _getEl('stock-adjustment-qty').value = '';
+        if (_getEl('stock-adjustment-note')) _getEl('stock-adjustment-note').value = '';
     }
 
     function saveProductFromForm() {
         const els = _getEls();
         const db = _getDb();
-        const name = (els['product-edit-name'] && els['product-edit-name'].value || '').trim();
-        const sku = (els['product-edit-sku'] && els['product-edit-sku'].value || '').trim();
-        const barcode = (els['product-edit-barcode'] && els['product-edit-barcode'].value || '').trim();
-        const category = (els['product-edit-category'] && els['product-edit-category'].value || '').trim();
-        const brand = (els['product-edit-brand'] && els['product-edit-brand'].value || '').trim();
-        const supplier = (els['product-edit-supplier'] && els['product-edit-supplier'].value || '').trim();
-        const buy = (UTILS && typeof UTILS.parseMoneyInput === 'function') ? UTILS.parseMoneyInput(els['product-edit-buy'] && els['product-edit-buy'].value) : parseFloat(els['product-edit-buy'] && els['product-edit-buy'].value || '0');
-        const sell = (UTILS && typeof UTILS.parseMoneyInput === 'function') ? UTILS.parseMoneyInput(els['product-edit-sell'] && els['product-edit-sell'].value) : parseFloat(els['product-edit-sell'] && els['product-edit-sell'].value || '0');
-        const stock = parseInt(els['product-edit-stock'] && els['product-edit-stock'].value || '0', 10);
-        const low = parseInt(els['product-edit-low'] && els['product-edit-low'].value || '0', 10);
+        const name = (_getEl('product-edit-name') && _getEl('product-edit-name').value || '').trim();
+        const sku = (_getEl('product-edit-sku') && _getEl('product-edit-sku').value || '').trim();
+        const barcode = (_getEl('product-edit-barcode') && _getEl('product-edit-barcode').value || '').trim();
+        const category = (_getEl('product-edit-category') && _getEl('product-edit-category').value || '').trim();
+        const brand = (_getEl('product-edit-brand') && _getEl('product-edit-brand').value || '').trim();
+        const supplier = (_getEl('product-edit-supplier') && _getEl('product-edit-supplier').value || '').trim();
+        const buy = (UTILS && typeof UTILS.parseMoneyInput === 'function') ? UTILS.parseMoneyInput(_getEl('product-edit-buy') && _getEl('product-edit-buy').value) : parseFloat(_getEl('product-edit-buy') && _getEl('product-edit-buy').value || '0');
+        const sell = (UTILS && typeof UTILS.parseMoneyInput === 'function') ? UTILS.parseMoneyInput(_getEl('product-edit-sell') && _getEl('product-edit-sell').value) : parseFloat(_getEl('product-edit-sell') && _getEl('product-edit-sell').value || '0');
+        const stock = parseInt(_getEl('product-edit-stock') && _getEl('product-edit-stock').value || '0', 10);
+        const low = parseInt(_getEl('product-edit-low') && _getEl('product-edit-low').value || '0', 10);
 
         if (!name || !sku) { return _showToast('Product', 'Name & SKU are required.', 'error'); }
         if (sell < buy) { _showToast('Warning', 'Selling price is below buying price.', 'error'); }
 
-        const existingId = els['product-edit-name'] && els['product-edit-name'].dataset.productId;
+        const existingId = _getEl('product-edit-name') && _getEl('product-edit-name').dataset.productId;
         let product;
         if (existingId) product = db.products.find(p => p.id === existingId);
 
@@ -535,16 +640,16 @@
 
     function focusProductSearch() {
         const els = _getEls();
-        if (els['product-search']) { els['product-search'].focus(); els['product-search'].select(); }
+        if (_getEl('product-search')) { _getEl('product-search').focus(); _getEl('product-search').select(); }
     }
 
     // Close overlay when clicking outside (if overlay exists and toggle not set)
     document.addEventListener('click', (ev) => {
         const els = _getEls();
-        const overlay = els['product-overlay'];
-        const search = els['product-search'];
+        const overlay = _getById('product-overlay');
+        const search = _getEl('product-search');
         if (!overlay) return;
-        const toggle = els['toggle-all-products'];
+        const toggle = _getEl('toggle-all-products');
         // if showing all products via checkbox or button, don't auto-close
         if (toggle) {
             if (toggle.tagName === 'INPUT' && toggle.checked) return;

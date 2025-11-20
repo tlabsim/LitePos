@@ -12,6 +12,7 @@
         return {
             version: 1,
             shop: { name: 'LitePOS Demo Shop', address: '', phone: '' },
+            settings: { currency: '৳', defaultPrintSize: 'a4', defaultPrintTemplate: 'standard' },
             users: [],
             customers: [],
             products: [],
@@ -56,6 +57,10 @@
             if (!parsed.version) parsed.version = 1;
             if (!parsed.counters) parsed.counters = { nextSaleId: 1 };
             if (!parsed.flags) parsed.flags = { seededSampleData: false };
+            // Ensure settings object exists with defaults
+            if (!parsed.settings) {
+                parsed.settings = { currency: '৳', defaultPrintSize: 'a4', defaultPrintTemplate: 'standard' };
+            }
             ns.state.db = parsed;
             return parsed;
         } catch (e) {

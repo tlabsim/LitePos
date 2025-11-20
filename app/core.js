@@ -26,12 +26,15 @@
     // Cached DOM references
     const els = {};
     const getElement = (id) => {
-        if (els[id]) return els[id];
-        else {
-            const el = document.getElementById(id);
-            els[id] = el;
-            return el;
+        // Use ui.getElement() as single source of truth for element caching
+        if (window.LitePos && window.LitePos.ui && typeof window.LitePos.ui.getElement === 'function') {
+            return window.LitePos.ui.getElement(id);
         }
+        // Fallback for early initialization before modules load
+        if (els[id]) return els[id];
+        const el = document.getElementById(id);
+        if (el) els[id] = el;
+        return el;
     };
 
     const modalNotifier = (() => {
@@ -306,9 +309,9 @@
         if (window.LitePos && window.LitePos.api && typeof window.LitePos.api.saveDb === 'function') {
             try {
                 window.LitePos.api.saveDb(next);
-                // mirror local state
+                // mirror local state - always update with the latest
                 window.LitePos.state = window.LitePos.state || {};
-                window.LitePos.state.db = window.LitePos.state.db || next || db;
+                window.LitePos.state.db = next || window.LitePos.state.db || db;
                 db = window.LitePos.state.db;
                 return;
             } catch (e) {
@@ -459,6 +462,7 @@
         const ids = [
             'login-screen', 'main-screen',
             'header-shop-name', 'header-shop-address', 'header-shop-phone',
+            'header-logo-img', 'header-logo-text', 'header-logo-container',
             'header-user-label', 'header-user-role', 'header-session-pill',
             'btn-logout',
 
@@ -489,9 +493,15 @@
             'today-summary-small', 'today-salesperson-name', 'today-last-sale',
 
             // Receipt
-            'receipt-print', 'receipt-shop-name', 'receipt-shop-address', 'receipt-shop-phone',
+            'receipt-print', 'receipt-standard', 'receipt-compact',
+            'receipt-shop-name', 'receipt-shop-address', 'receipt-shop-phone',
+            'receipt-logo-standard', 'receipt-logo-compact',
             'receipt-sale-meta', 'receipt-items-body',
             'receipt-subtotal', 'receipt-discount', 'receipt-total', 'receipt-payment', 'receipt-change',
+            'receipt-shop-name-compact', 'receipt-shop-address-compact', 'receipt-shop-phone-compact',
+            'receipt-sale-meta-compact', 'receipt-items-body-compact',
+            'receipt-subtotal-compact', 'receipt-discount-compact', 'receipt-total-compact', 
+            'receipt-payment-compact', 'receipt-change-compact',
 
             // Customers tab
             'customer-search', 'customers-table-body',
@@ -525,7 +535,10 @@
 
             // Admin
             'shop-name', 'shop-address', 'shop-phone',
+            'shop-logo-input', 'shop-logo-preview', 'shop-logo-preview-img', 'btn-remove-logo',
             'btn-save-shop-settings',
+            'global-currency-symbol', 'global-print-size', 'global-print-template',
+            'btn-save-global-settings',
             'users-table-body',
             'user-edit-name', 'user-edit-username', 'user-edit-pin', 'user-edit-role',
             'btn-save-user', 'btn-new-user',
@@ -570,23 +583,23 @@
     }
 
     function showSetupOnly() {
-        if (els['login-screen']) els['login-screen'].classList.remove('hidden');
-        if (els['main-screen']) els['main-screen'].classList.add('hidden');
-        if (els['setup-panel']) els['setup-panel'].classList.remove('hidden');
-        if (els['signin-panel']) els['signin-panel'].classList.add('hidden');
+        if (getElement('login-screen')) getElement('login-screen').classList.remove('hidden');
+        if (getElement('main-screen')) getElement('main-screen').classList.add('hidden');
+        if (getElement('setup-panel')) getElement('setup-panel').classList.remove('hidden');
+        if (getElement('signin-panel')) getElement('signin-panel').classList.add('hidden');
     }
 
     function showLoginOnly() {
-        if (els['login-screen']) els['login-screen'].classList.remove('hidden');
-        if (els['main-screen']) els['main-screen'].classList.add('hidden');
-        if (els['setup-panel']) els['setup-panel'].classList.add('hidden');
-        if (els['signin-panel']) els['signin-panel'].classList.remove('hidden');
+        if (getElement('login-screen')) getElement('login-screen').classList.remove('hidden');
+        if (getElement('main-screen')) getElement('main-screen').classList.add('hidden');
+        if (getElement('setup-panel')) getElement('setup-panel').classList.add('hidden');
+        if (getElement('signin-panel')) getElement('signin-panel').classList.remove('hidden');
         populateLoginUserSelect();
     }
 
     function showMainScreen() {
-        if (els['login-screen']) els['login-screen'].classList.add('hidden');
-        if (els['main-screen']) els['main-screen'].classList.remove('hidden');
+        if (getElement('login-screen')) getElement('login-screen').classList.add('hidden');
+        if (getElement('main-screen')) getElement('main-screen').classList.remove('hidden');
         
         // Restore last active tab or default to sale tab
         let savedTab = 'tab-sale';
@@ -599,12 +612,15 @@
             console.error('Failed to restore tab:', e);
         }
         switchTab(savedTab);
-        
-        focusCustomerPhone();
+
+        // If sale tab, focus product search
+        if (savedTab === 'tab-sale') {
+            focusSaleProductSearchInput();
+        }
     }
 
     function populateLoginUserSelect() {
-        const sel = els['login-user'];
+        const sel = getElement('login-user');
         if (!sel) return;
         sel.innerHTML = '';
         db.users.forEach(u => {
@@ -616,10 +632,10 @@
     }
 
     function handleSetupCreate() {
-        const name = els['setup-name'].value.trim();
-        const username = els['setup-username'].value.trim();
-        const pin = els['setup-pin'].value.trim();
-        const pin2 = els['setup-pin-confirm'].value.trim();
+        const name = getElement('setup-name').value.trim();
+        const username = getElement('setup-username').value.trim();
+        const pin = getElement('setup-pin').value.trim();
+        const pin2 = getElement('setup-pin-confirm').value.trim();
 
         if (!name || !username || !pin || !pin2) {
             return showToast('Setup', 'Please fill all fields.', 'error');
@@ -654,8 +670,8 @@
     }
 
     function handleLogin() {
-        const userId = els['login-user'].value;
-        const pin = els['login-pin'].value.trim();
+        const userId = getElement('login-user').value;
+        const pin = getElement('login-pin').value.trim();
         const user = db.users.find(u => u.id === userId);
         if (!user) return showToast('Login', 'User not found.', 'error');
 
@@ -667,7 +683,7 @@
         saveSession({ userId: user.id, loggedInAt: new Date().toISOString() });
 
         showToast('Welcome', `Signed in as ${user.name}`, 'success');
-        els['login-pin'].value = '';
+        getElement('login-pin').value = '';
         showMainScreen();
         loadShopIntoHeader();
         applyRoleUI();
@@ -683,15 +699,28 @@
     }
 
     function loadShopIntoHeader() {
-        els['header-shop-name'].textContent = db.shop.name || 'LitePOS';
-        els['header-shop-address'].textContent = db.shop.address || '';
-        els['header-shop-phone'].textContent = db.shop.phone || '';
+        getElement('header-shop-name').textContent = db.shop.name || 'LitePOS';
+        getElement('header-shop-address').textContent = db.shop.address || '';
+        getElement('header-shop-phone').textContent = db.shop.phone || '';
+        
+        // Update logo in header
+        const logoImg = getElement('header-logo-img');
+        const logoText = getElement('header-logo-text');
+        if (db.shop && db.shop.logo && logoImg && logoText) {
+            logoImg.src = db.shop.logo;
+            logoImg.style.display = 'block';
+            logoText.style.display = 'none';
+        } else if (logoImg && logoText) {
+            logoImg.style.display = 'none';
+            logoText.style.display = 'block';
+        }
+        
         if (currentUser) {
-            els['header-user-label'].textContent = currentUser.name;
-            els['header-user-role'].textContent = currentUser.role === ROLE_SUPERADMIN ? 'Superadmin' : 'Sales';
+            getElement('header-user-label').textContent = currentUser.name;
+            getElement('header-user-role').textContent = currentUser.role === ROLE_SUPERADMIN ? 'Superadmin' : 'Sales';
         } else {
-            els['header-user-label'].textContent = 'Not signed in';
-            els['header-user-role'].textContent = '';
+            getElement('header-user-label').textContent = 'Not signed in';
+            getElement('header-user-role').textContent = '';
         }
     }
 
@@ -712,19 +741,19 @@
 
     function attachGlobalHandlers() {
         // Setup / login
-        if (els['btn-setup-create']) {
-            els['btn-setup-create'].addEventListener('click', handleSetupCreate);
+        if (getElement('btn-setup-create')) {
+            getElement('btn-setup-create').addEventListener('click', handleSetupCreate);
         }
-        if (els['btn-login']) {
-            els['btn-login'].addEventListener('click', handleLogin);
+        if (getElement('btn-login')) {
+            getElement('btn-login').addEventListener('click', handleLogin);
         }
-        if (els['btn-logout']) {
-            els['btn-logout'].addEventListener('click', handleLogout);
+        if (getElement('btn-logout')) {
+            getElement('btn-logout').addEventListener('click', handleLogout);
         }
 
         // Enter key on login PIN
-        if (els['login-pin']) {
-            els['login-pin'].addEventListener('keydown', ev => {
+        if (getElement('login-pin')) {
+            getElement('login-pin').addEventListener('keydown', ev => {
                 if (ev.key === 'Enter') handleLogin();
             });
         }
@@ -744,21 +773,21 @@
         window.addEventListener('keydown', handleKeyShortcuts);
 
         // POS: customer & quick add
-        if (els['btn-search-customer']) {
-            els['btn-search-customer'].addEventListener('click', findCustomerFromInput);
+        if (getElement('btn-search-customer')) {
+            getElement('btn-search-customer').addEventListener('click', findCustomerFromInput);
         }
-        if (els['sale-customer-phone']) {
-            els['sale-customer-phone'].addEventListener('keydown', ev => {
+        if (getElement('sale-customer-phone')) {
+            getElement('sale-customer-phone').addEventListener('keydown', ev => {
                 if (ev.key === 'Enter') {
                     findCustomerFromInput();
                 }
             });
         }
-        if (els['btn-save-quick-customer']) {
-            els['btn-save-quick-customer'].addEventListener('click', saveQuickCustomer);
+        if (getElement('btn-save-quick-customer')) {
+            getElement('btn-save-quick-customer').addEventListener('click', saveQuickCustomer);
         }
-        if (els['btn-same-as-total']) {
-            els['btn-same-as-total'].addEventListener('click', () => {
+        if (getElement('btn-same-as-total')) {
+            getElement('btn-same-as-total').addEventListener('click', () => {
                 
                 // Sync state from module if needed
                 if (window.LitePos && window.LitePos.state && window.LitePos.state.currentSale) {
@@ -773,12 +802,12 @@
                 const totalAmount = currentSale.total || 0;
                 
                 // Set the input value
-                if (els['input-payment']) {
-                    els['input-payment'].value = String(totalAmount);
+                if (getElement('input-payment')) {
+                    getElement('input-payment').value = String(totalAmount);
                     
                     // Trigger the input event to update currentSale.payment and call updateSaleTotals
                     const event = new Event('input', { bubbles: true });
-                    els['input-payment'].dispatchEvent(event);
+                    getElement('input-payment').dispatchEvent(event);
                 } else {
                     console.error('[Same as Payable] Input element NOT found!');
                 }
@@ -786,155 +815,155 @@
         } else {
             console.error('[Event Handler] btn-same-as-total element NOT found!');
         }
-        if (els['btn-clear-customer']) {
-            els['btn-clear-customer'].addEventListener('click', () => {
+        if (getElement('btn-clear-customer')) {
+            getElement('btn-clear-customer').addEventListener('click', () => {
                 setCurrentCustomer(null);
             });
         }
 
         // POS: product search
-        if (els['product-search']) {
-            els['product-search'].addEventListener('input', renderProductSearchTable);
+        if (getElement('product-search')) {
+            getElement('product-search').addEventListener('input', renderProductSearchTable);
         }
 
         // POS: discount / payment inputs
-        if (els['input-discount']) {
-            els['input-discount'].addEventListener('input', () => {
+        if (getElement('input-discount')) {
+            getElement('input-discount').addEventListener('input', () => {
                 if (!currentSale) return;
-                currentSale.discount = parseMoneyInput(els['input-discount'].value);
+                currentSale.discount = parseMoneyInput(getElement('input-discount').value);
                 clampDiscount();
                 updateSaleTotals();
             });
         }
-        if (els['input-payment']) {
-            els['input-payment'].addEventListener('input', () => {
+        if (getElement('input-payment')) {
+            getElement('input-payment').addEventListener('input', () => {
                 if (!currentSale) return;
-                currentSale.payment = parseMoneyInput(els['input-payment'].value);
+                currentSale.payment = parseMoneyInput(getElement('input-payment').value);
                 updateSaleTotals();
             });
         }
 
         // POS: sale controls
-        if (els['btn-new-sale']) {
-            els['btn-new-sale'].addEventListener('click', handleNewSaleClick);
+        if (getElement('btn-new-sale')) {
+            getElement('btn-new-sale').addEventListener('click', handleNewSaleClick);
         }
-        if (els['btn-hold-sale']) {
-            els['btn-hold-sale'].addEventListener('click', holdCurrentSale);
+        if (getElement('btn-hold-sale')) {
+            getElement('btn-hold-sale').addEventListener('click', holdCurrentSale);
         }
-        if (els['btn-cancel-sale']) {
-            els['btn-cancel-sale'].addEventListener('click', cancelCurrentSale);
+        if (getElement('btn-cancel-sale')) {
+            getElement('btn-cancel-sale').addEventListener('click', cancelCurrentSale);
         }
-        if (els['btn-clear-cart']) {
-            els['btn-clear-cart'].addEventListener('click', clearCart);
+        if (getElement('btn-clear-cart')) {
+            getElement('btn-clear-cart').addEventListener('click', clearCart);
         }
-        if (els['btn-complete-sale']) {
-            els['btn-complete-sale'].addEventListener('click', completeCurrentSale);
+        if (getElement('btn-complete-sale')) {
+            getElement('btn-complete-sale').addEventListener('click', completeCurrentSale);
         }
 
         // POS: print last receipt
-        if (els['btn-print-last-receipt']) {
-            els['btn-print-last-receipt'].addEventListener('click', printLastReceipt);
+        if (getElement('btn-print-last-receipt')) {
+            getElement('btn-print-last-receipt').addEventListener('click', printLastReceipt);
         }
 
         // Customers tab
-        if (els['customer-search']) {
-            els['customer-search'].addEventListener('input', renderCustomersTable);
+        if (getElement('customer-search')) {
+            getElement('customer-search').addEventListener('input', renderCustomersTable);
         }
-        if (els['btn-save-customer-edit']) {
-            els['btn-save-customer-edit'].addEventListener('click', saveCustomerFromForm);
+        if (getElement('btn-save-customer-edit')) {
+            getElement('btn-save-customer-edit').addEventListener('click', saveCustomerFromForm);
         }
-        if (els['btn-new-customer']) {
-            els['btn-new-customer'].addEventListener('click', clearCustomerForm);
+        if (getElement('btn-new-customer')) {
+            getElement('btn-new-customer').addEventListener('click', clearCustomerForm);
         }
 
         // Clear button handlers
-        if (els['btn-clear-product-search']) {
-            els['btn-clear-product-search'].addEventListener('click', () => {
-                if (els['product-search']) {
-                    els['product-search'].value = '';
+        if (getElement('btn-clear-product-search')) {
+            getElement('btn-clear-product-search').addEventListener('click', () => {
+                if (getElement('product-search')) {
+                    getElement('product-search').value = '';
                     // Focus back to input
-                    els['product-search'].focus();
+                    getElement('product-search').focus();
                     renderProductSearchTable();
                 }
             });
         }
-        if (els['btn-clear-customer-phone']) {
-            els['btn-clear-customer-phone'].addEventListener('click', () => {
-                if (els['sale-customer-phone']) {
-                    els['sale-customer-phone'].value = '';
+        if (getElement('btn-clear-customer-phone')) {
+            getElement('btn-clear-customer-phone').addEventListener('click', () => {
+                if (getElement('sale-customer-phone')) {
+                    getElement('sale-customer-phone').value = '';
                     setCurrentCustomer(null);
-                    if (els['customer-overlay']) {
-                        els['customer-overlay'].classList.add('hidden');
+                    if (getElement('customer-overlay')) {
+                        getElement('customer-overlay').classList.add('hidden');
                     }
                 }
             });
         }
 
         // Products tab
-        if (els['product-manage-search']) {
-            els['product-manage-search'].addEventListener('input', () => {
+        if (getElement('product-manage-search')) {
+            getElement('product-manage-search').addEventListener('input', () => {
                 currentProductsPage = 1; // Reset to first page on search
                 renderProductsTable();
             });
         }
-        if (els['product-filter-category']) {
-            els['product-filter-category'].addEventListener('change', () => {
+        if (getElement('product-filter-category')) {
+            getElement('product-filter-category').addEventListener('change', () => {
                 currentProductsPage = 1; // Reset to first page on filter
                 renderProductsTable();
             });
         }
-        if (els['product-filter-brand']) {
-            els['product-filter-brand'].addEventListener('change', () => {
+        if (getElement('product-filter-brand')) {
+            getElement('product-filter-brand').addEventListener('change', () => {
                 currentProductsPage = 1; // Reset to first page on filter
                 renderProductsTable();
             });
         }
-        if (els['product-filter-supplier']) {
-            els['product-filter-supplier'].addEventListener('change', () => {
+        if (getElement('product-filter-supplier')) {
+            getElement('product-filter-supplier').addEventListener('change', () => {
                 currentProductsPage = 1; // Reset to first page on filter
                 renderProductsTable();
             });
         }
-        if (els['product-sort']) {
-            els['product-sort'].addEventListener('change', () => {
+        if (getElement('product-sort')) {
+            getElement('product-sort').addEventListener('change', () => {
                 currentProductsPage = 1; // Reset to first page on sort
                 renderProductsTable();
             });
         }
-        if (els['product-filter-low-stock']) {
-            els['product-filter-low-stock'].addEventListener('change', () => {
+        if (getElement('product-filter-low-stock')) {
+            getElement('product-filter-low-stock').addEventListener('change', () => {
                 currentProductsPage = 1;
                 renderProductsTable();
             });
         }
-        if (els['btn-product-prev-page']) {
-            els['btn-product-prev-page'].addEventListener('click', () => {
+        if (getElement('btn-product-prev-page')) {
+            getElement('btn-product-prev-page').addEventListener('click', () => {
                 if (currentProductsPage > 1) {
                     currentProductsPage--;
                     renderProductsTable();
                 }
             });
         }
-        if (els['btn-product-next-page']) {
-            els['btn-product-next-page'].addEventListener('click', () => {
+        if (getElement('btn-product-next-page')) {
+            getElement('btn-product-next-page').addEventListener('click', () => {
                 currentProductsPage++;
                 renderProductsTable();
             });
         }
-        if (els['btn-save-product']) {
-            els['btn-save-product'].addEventListener('click', saveProductFromForm);
+        if (getElement('btn-save-product')) {
+            getElement('btn-save-product').addEventListener('click', saveProductFromForm);
         }
-        if (els['btn-new-product']) {
-            els['btn-new-product'].addEventListener('click', clearProductForm);
+        if (getElement('btn-new-product')) {
+            getElement('btn-new-product').addEventListener('click', clearProductForm);
         }
-        if (els['btn-delete-product']) {
-            els['btn-delete-product'].addEventListener('click', deleteProduct);
+        if (getElement('btn-delete-product')) {
+            getElement('btn-delete-product').addEventListener('click', deleteProduct);
         }
-        if (els['btn-save-stock-adjustment']) {
-            els['btn-save-stock-adjustment'].addEventListener('click', saveStockAdjustment);
+        if (getElement('btn-save-stock-adjustment')) {
+            getElement('btn-save-stock-adjustment').addEventListener('click', saveStockAdjustment);
         }
-        if (els['btn-toggle-stock-updates']) {
-            els['btn-toggle-stock-updates'].addEventListener('click', (e) => {
+        if (getElement('btn-toggle-stock-updates')) {
+            getElement('btn-toggle-stock-updates').addEventListener('click', (e) => {
                 e.stopPropagation();
                 const body = document.getElementById('stock-updates-body');
                 const btn = document.getElementById('btn-toggle-stock-updates');
@@ -947,8 +976,8 @@
                 }
             });
         }
-        if (els['stock-updates-header']) {
-            els['stock-updates-header'].addEventListener('click', () => {
+        if (getElement('stock-updates-header')) {
+            getElement('stock-updates-header').addEventListener('click', () => {
                 const body = document.getElementById('stock-updates-body');
                 const btn = document.getElementById('btn-toggle-stock-updates');
                 if (body && btn) {
@@ -969,37 +998,48 @@
                     els[id].addEventListener('change', renderSalesTable);
                 }
             });
-        if (els['btn-sales-clear-filters']) {
-            els['btn-sales-clear-filters'].addEventListener('click', clearSalesFilters);
+        if (getElement('btn-sales-clear-filters')) {
+            getElement('btn-sales-clear-filters').addEventListener('click', clearSalesFilters);
         }
 
         // Reports
-        if (els['btn-export-csv']) {
-            els['btn-export-csv'].addEventListener('click', exportCsvReport);
+        if (getElement('btn-export-csv')) {
+            getElement('btn-export-csv').addEventListener('click', exportCsvReport);
         }
-        if (els['btn-print-report']) {
-            els['btn-print-report'].addEventListener('click', printReport);
+        if (getElement('btn-print-report')) {
+            getElement('btn-print-report').addEventListener('click', printReport);
         }
 
         // Admin: shop settings
-        if (els['btn-save-shop-settings']) {
-            els['btn-save-shop-settings'].addEventListener('click', saveShopSettingsFromForm);
+        if (getElement('btn-save-shop-settings')) {
+            getElement('btn-save-shop-settings').addEventListener('click', saveShopSettingsFromForm);
+        }
+        if (getElement('shop-logo-input')) {
+            getElement('shop-logo-input').addEventListener('change', handleLogoUpload);
+        }
+        if (getElement('btn-remove-logo')) {
+            getElement('btn-remove-logo').addEventListener('click', removeLogo);
+        }
+        
+        // Admin: global settings
+        if (getElement('btn-save-global-settings')) {
+            getElement('btn-save-global-settings').addEventListener('click', saveGlobalSettings);
         }
 
         // Admin: users
-        if (els['btn-save-user']) {
-            els['btn-save-user'].addEventListener('click', saveUserFromForm);
+        if (getElement('btn-save-user')) {
+            getElement('btn-save-user').addEventListener('click', saveUserFromForm);
         }
-        if (els['btn-new-user']) {
-            els['btn-new-user'].addEventListener('click', clearUserForm);
+        if (getElement('btn-new-user')) {
+            getElement('btn-new-user').addEventListener('click', clearUserForm);
         }
 
         // Admin: backup/restore
-        if (els['btn-backup-download']) {
-            els['btn-backup-download'].addEventListener('click', downloadBackup);
+        if (getElement('btn-backup-download')) {
+            getElement('btn-backup-download').addEventListener('click', downloadBackup);
         }
-        if (els['backup-file-input']) {
-            els['backup-file-input'].addEventListener('change', handleRestoreFile);
+        if (getElement('backup-file-input')) {
+            getElement('backup-file-input').addEventListener('change', handleRestoreFile);
         }
 
         // Clean up print classes after printing
@@ -1009,9 +1049,10 @@
     }
 
     function handleKeyShortcuts(ev) {
-        const inLogin = !els['main-screen'].classList.contains('hidden');
+        const inMainScreen = !getElement('main-screen').classList.contains('hidden');
 
-        if (!inLogin && ev.altKey) {
+        if (inMainScreen && ev.altKey) {
+            ev.preventDefault(); // Prevent browser default Alt key behavior
             // Tabs Alt+1..6
             switch (ev.key) {
                 case '1': switchTab('tab-sale'); break;
@@ -1096,6 +1137,11 @@
                 renderProductSearchTable();
                 renderOpenSalesStrip();
                 updateSaleTotals();
+                // Initialize receipt size from global settings
+                if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.initReceiptSize === 'function') {
+                    window.LitePos.pos.initReceiptSize();
+                }
+                focusSaleProductSearchInput();
                 break;
             case 'tab-customers':
                 renderCustomersTable();
@@ -1113,6 +1159,7 @@
                 break;
             case 'tab-admin':
                 loadShopForm();
+                loadGlobalSettings();
                 renderUsersTable();
                 populateSalespersonFilter();
                 break;
@@ -1124,122 +1171,50 @@
     // -------------------------
 
     function findCustomerFromInput() {
-        if (window.LitePos && window.LitePos.customers && typeof window.LitePos.customers.findCustomerFromInput === 'function') {
-            try { return window.LitePos.customers.findCustomerFromInput(); } catch (e) { console.error(e); }
+        if (window.LitePos?.customers?.findCustomerFromInput) {
+            return window.LitePos.customers.findCustomerFromInput();
         }
-        const phone = (els['sale-customer-phone'].value || '').trim();
-        if (!phone) {
-            setCurrentCustomer(null);
-            showToast('Customer search', 'Please enter phone number.', 'error');
-            return;
-        }
-        const customer = db.customers.find(c => c.phone === phone);
-        if (customer) {
-            setCurrentCustomer(customer);
-            els['sale-customer-name'].value = customer.name;
-            showToast('Customer found', customer.name, 'success');
-        } else {
-            setCurrentCustomer({
-                id: null,
-                name: '',
-                phone,
-                notes: '',
-                lastSaleAt: null,
-                lastSaleTotal: 0
-            });
-            els['sale-customer-name'].value = '';
-            showToast('New customer', 'Not found, you can quick-add.', 'success');
-        }
+        console.error('findCustomerFromInput: customers module not loaded');
     }
 
     function setCurrentCustomer(customer) {
-        if (window.LitePos && window.LitePos.customers && typeof window.LitePos.customers.setCurrentCustomer === 'function') {
-            try { 
-                // Sync state before calling module
-                if (window.LitePos.state) {
-                    window.LitePos.state.currentSale = currentSale;
-                    window.LitePos.state.db = db;
-                }
-                window.LitePos.customers.setCurrentCustomer(customer);
-                // Sync state back after calling module
-                if (window.LitePos.state && window.LitePos.state.currentSale) {
-                    currentSale = window.LitePos.state.currentSale;
-                }
-                // Trigger auto-save after customer update
-                if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.autoSaveCurrentSale === 'function') {
-                    window.LitePos.pos.autoSaveCurrentSale();
-                }
-                return;
-            } catch (e) { console.error(e); }
-        }
-        if (!currentSale) {
-            currentSale = createEmptySale();
-            if (window.LitePos && window.LitePos.state) {
+        if (window.LitePos?.customers?.setCurrentCustomer) {
+            if (window.LitePos.state) {
                 window.LitePos.state.currentSale = currentSale;
+                window.LitePos.state.db = db;
             }
+            window.LitePos.customers.setCurrentCustomer(customer);
+            if (window.LitePos.state?.currentSale) {
+                currentSale = window.LitePos.state.currentSale;
+            }
+            if (window.LitePos.pos?.autoSaveCurrentSale) {
+                window.LitePos.pos.autoSaveCurrentSale();
+            }
+            return;
         }
-        currentSale.customer = customer || null;
-
-        if (!customer) {
-            if (els['summary-customer-badge']) els['summary-customer-badge'].textContent = 'Walk-in';
-            if (els['summary-customer-name']) els['summary-customer-name'].textContent = 'Not selected';
-            if (els['summary-customer-meta']) els['summary-customer-meta'].textContent = 'Phone · —';
-            if (els['summary-customer-status']) els['summary-customer-status'].textContent = 'Status · New';
-            if (els['sale-customer-phone']) els['sale-customer-phone'].value = '';
-            if (els['sale-customer-name']) els['sale-customer-name'].value = '';
-        } else {
-            if (els['summary-customer-badge']) els['summary-customer-badge'].textContent = customer.id ? 'Returning' : 'Walk-in';
-            if (els['summary-customer-name']) els['summary-customer-name'].textContent = customer.name || 'Walk-in';
-            if (els['summary-customer-meta']) els['summary-customer-meta'].textContent = `Phone · ${customer.phone || '—'}`;
-            if (els['summary-customer-status']) els['summary-customer-status'].textContent = customer.id ? 'Status · Existing' : 'Status · New';
-            if (els['sale-customer-phone']) els['sale-customer-phone'].value = customer.phone || '';
-            if (els['sale-customer-name']) els['sale-customer-name'].value = customer.name || '';
-        }
+        console.error('setCurrentCustomer: customers module not loaded');
     }
 
     function saveQuickCustomer() {
-        if (window.LitePos && window.LitePos.customers && typeof window.LitePos.customers.saveQuickCustomer === 'function') {
-            try { return window.LitePos.customers.saveQuickCustomer(); } catch (e) { console.error(e); }
+        if (window.LitePos?.customers?.saveQuickCustomer) {
+            return window.LitePos.customers.saveQuickCustomer();
         }
-        const phone = (els['sale-customer-phone'].value || '').trim();
-        if (!phone) {
-            return showToast('Quick add', 'Enter phone number first.', 'error');
-        }
-        const name = (els['quick-customer-name'].value || '').trim() ||
-            (els['sale-customer-name'].value || '').trim() || 'Customer';
-        const notes = (els['quick-customer-notes'].value || '').trim();
+        console.error('saveQuickCustomer: customers module not loaded');
+    }
 
-        let existing = db.customers.find(c => c.phone === phone);
-        if (existing) {
-            existing.name = name;
-            existing.notes = notes;
-        } else {
-            existing = {
-                id: 'c' + (db.customers.length + 1),
-                name,
-                phone,
-                notes,
-                lastSaleAt: null,
-                lastSaleTotal: 0
-            };
-            db.customers.push(existing);
+    function focusSaleProductSearchInput() {
+        const el = getElement('product-search');
+        if (el) {
+            el.focus();
+            el.select();
         }
-        saveDb();
-        setCurrentCustomer(existing);
-        els['quick-customer-name'].value = '';
-        els['quick-customer-notes'].value = '';
-        showToast('Customer saved', `${existing.name} (${existing.phone || 'no phone'})`, 'success');
-        renderCustomersTable();
     }
 
     function focusCustomerPhone() {
-        if (window.LitePos && window.LitePos.customers && typeof window.LitePos.customers.focusCustomerPhone === 'function') {
-            try { return window.LitePos.customers.focusCustomerPhone(); } catch (e) { console.error(e); }
+        if (window.LitePos?.customers?.focusCustomerPhone) {
+            return window.LitePos.customers.focusCustomerPhone();
         }
-        if (els['sale-customer-phone']) {
-            els['sale-customer-phone'].focus();
-            els['sale-customer-phone'].select();
-        }
+        console.error('focusCustomerPhone: customers module not loaded');
     }
 
     // -------------------------
@@ -1278,152 +1253,64 @@
     }
 
     function createEmptySale() {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.createEmptySale === 'function') {
-            try { return window.LitePos.pos.createEmptySale(); } catch (e) { console.error(e); }
+        if (window.LitePos?.pos?.createEmptySale) {
+            return window.LitePos.pos.createEmptySale();
         }
-        return {
-            id: null,
-            status: 'new',
-            items: [],
-            discount: 0,
-            payment: 0,
-            subtotal: 0,
-            total: 0,
-            change: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            customer: null,
-            salespersonId: currentUser ? currentUser.id : null,
-            lastModifiedBy: currentUser ? currentUser.id : null
-        };
+        console.error('createEmptySale: pos module not loaded');
+        return null;
     }
 
     function startNewSale(notify) {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.startNewSale === 'function') {
-            try {
-                window.LitePos.pos.startNewSale(notify);
-                // Sync module state back to core
-                if (window.LitePos.state && window.LitePos.state.currentSale) {
-                    currentSale = window.LitePos.state.currentSale;
-                }
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.pos?.startNewSale) {
+            window.LitePos.pos.startNewSale(notify);
+            if (window.LitePos.state?.currentSale) {
+                currentSale = window.LitePos.state.currentSale;
+            }
+            return;
         }
-        currentSale = createEmptySale();
-        if (window.LitePos && window.LitePos.state) {
-            window.LitePos.state.currentSale = currentSale;
-        }
-        setCurrentCustomer(null);
-        els['input-discount'].value = '0';
-        els['input-payment'].value = '0';
-        els['cart-table-body'].innerHTML = '';
-        els['summary-sale-status'].textContent = 'New';
-        if (els['summary-sale-id-value']) {
-            els['summary-sale-id-value'].textContent = 'New';
-        }
-        syncCartUiState(false, { count: 0, hasSaleId: false });
-        renderCartTable();
-        renderOpenSalesStrip();
-        updateSaleTotals();
-        if (notify) showToast('New sale', 'Started a new sale.', 'success');
-        focusCustomerPhone();
+        console.error('startNewSale: pos module not loaded');
     }
 
     function clearCart() {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.clearCart === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
-                window.LitePos.pos.clearCart();
-                if (window.LitePos.state && window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.pos?.clearCart) {
+            if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
+            window.LitePos.pos.clearCart();
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
+            return;
         }
-        if (!currentSale) return;
-        currentSale.items = [];
-        updateSaleTotals();
-        renderCartTable();
+        console.error('clearCart: pos module not loaded');
     }
 
     function clampDiscount() {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.clampDiscount === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
-                window.LitePos.pos.clampDiscount();
-                if (window.LitePos.state && window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.pos?.clampDiscount) {
+            if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
+            window.LitePos.pos.clampDiscount();
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
+            return;
         }
-        if (!currentSale) return;
-        const subtotal = currentSale.subtotal || 0;
-        if (currentSale.discount > subtotal) {
-            currentSale.discount = subtotal;
-            els['input-discount'].value = String(subtotal);
-        }
-        if (currentSale.discount < 0) {
-            currentSale.discount = 0;
-            els['input-discount'].value = '0';
-        }
+        console.error('clampDiscount: pos module not loaded');
     }
 
     function updateSaleTotals() {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.updateSaleTotals === 'function') {
-            try {
-                // Sync core state to module state before calling
-                if (window.LitePos.state) {
-                    window.LitePos.state.currentSale = currentSale;
-                    window.LitePos.state.db = db;
-                }
-                window.LitePos.pos.updateSaleTotals();
-                // Sync back
-                if (window.LitePos.state && window.LitePos.state.currentSale) {
-                    currentSale = window.LitePos.state.currentSale;
-                }
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.pos?.updateSaleTotals) {
+            if (window.LitePos.state) {
+                window.LitePos.state.currentSale = currentSale;
+                window.LitePos.state.db = db;
+            }
+            window.LitePos.pos.updateSaleTotals();
+            if (window.LitePos.state?.currentSale) {
+                currentSale = window.LitePos.state.currentSale;
+            }
+            return;
         }
-        if (!currentSale) return;
-        let subtotal = 0;
-        currentSale.items.forEach(it => {
-            subtotal += it.qty * it.price;
-        });
-        currentSale.subtotal = subtotal;
-        clampDiscount();
-        currentSale.total = Math.max(0, subtotal - (currentSale.discount || 0));
-        currentSale.change = Math.max(0, (currentSale.payment || 0) - currentSale.total);
-        currentSale.updatedAt = new Date().toISOString();
-
-        // Sync to module state
-        if (window.LitePos && window.LitePos.state) {
-            window.LitePos.state.currentSale = currentSale;
-        }
-
-        els['summary-subtotal'].textContent = formatMoney(subtotal);
-        els['summary-total'].textContent = formatMoney(currentSale.total);
-        if (els['sale-header-total']) els['sale-header-total'].textContent = formatMoney(currentSale.total);
-        els['summary-items-count'].textContent = String(currentSale.items.reduce((s, it) => s + it.qty, 0));
-        els['summary-change'].textContent = formatMoney(currentSale.change);
-        
-        // Update discount percentage
-        if (els['discount-percentage']) {
-            const discountPercent = subtotal > 0 ? ((currentSale.discount / subtotal) * 100).toFixed(1) : 0;
-            els['discount-percentage'].textContent = `${discountPercent}%`;
-        }
-        
-        // Only update input fields if user is not actively editing them
-        const active = document.activeElement;
-        if (active !== els['input-discount']) {
-            els['input-discount'].value = currentSale.discount || 0;
-        }
-        if (active !== els['input-payment']) {
-            els['input-payment'].value = currentSale.payment || 0;
-        }
+        console.error('updateSaleTotals: pos module not loaded');
     }
 
     function syncCartUiState(hasItems, meta = {}) {
-        const cartTableWrapper = els['cart-table-wrapper'] || document.getElementById('cart-table-wrapper');
-        const emptyState = els['cart-empty-state'] || document.getElementById('cart-empty-state');
-        const countChip = els['cart-count-chip'] || document.getElementById('cart-count-chip');
-        const actionsRow = els['sale-actions-row'] || document.getElementById('sale-actions-row');
+        const cartTableWrapper = getElement('cart-table-wrapper') || document.getElementById('cart-table-wrapper');
+        const emptyState = getElement('cart-empty-state') || document.getElementById('cart-empty-state');
+        const countChip = getElement('cart-count-chip') || document.getElementById('cart-count-chip');
+        const actionsRow = getElement('sale-actions-row') || document.getElementById('sale-actions-row');
         const showEmpty = !hasItems;
         if (cartTableWrapper) {
             cartTableWrapper.classList.toggle('hidden', showEmpty);
@@ -1461,196 +1348,58 @@
     window.LitePos.ui.syncCartUiState = syncCartUiState;
 
     function renderCartTable() {
-        let renderedByModule = false;
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.renderCartTable === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
-                window.LitePos.pos.renderCartTable();
-                if (window.LitePos.state && window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                renderedByModule = true;
-            } catch (e) { console.error(e); }
-        }
-
-        const itemCount = currentSale && Array.isArray(currentSale.items)
-            ? currentSale.items.reduce((sum, it) => sum + (it.qty || 0), 0)
-            : 0;
-        const hasItems = itemCount > 0;
-        const hasSaleId = !!(currentSale && currentSale.id);
-        const meta = { count: itemCount, hasSaleId };
-        if (renderedByModule) {
-            syncCartUiState(hasItems, meta);
+        if (window.LitePos?.pos?.renderCartTable) {
+            if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
+            window.LitePos.pos.renderCartTable();
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
             return;
         }
-
-        const tbody = els['cart-table-body'];
-        if (!tbody) {
-            return;
-        }
-
-        tbody.innerHTML = '';
-        if (!currentSale) {
-            syncCartUiState(false, { count: 0, hasSaleId: false });
-            return;
-        }
-
-        syncCartUiState(hasItems, meta);
-        if (!hasItems) {
-            return;
-        }
-
-        currentSale.items.forEach((item, index) => {
-            const tr = document.createElement('tr');
-
-            const tdName = document.createElement('td');
-            tdName.textContent = item.name;
-            tr.appendChild(tdName);
-
-            const tdQty = document.createElement('td');
-            const qtyControls = document.createElement('div');
-            qtyControls.style.display = 'flex';
-            qtyControls.style.alignItems = 'center';
-            qtyControls.style.gap = '4px';
-
-            const btnMinus = document.createElement('button');
-            btnMinus.type = 'button';
-            btnMinus.className = 'btn btn-ghost btn-lg';
-            btnMinus.textContent = '−';
-            btnMinus.style.padding = '2px 8px';
-            btnMinus.addEventListener('click', () => changeCartQty(index, -1));
-
-            const spanQty = document.createElement('span');
-            spanQty.textContent = String(item.qty);
-            spanQty.style.minWidth = '18px';
-            spanQty.style.textAlign = 'center';
-
-            const btnPlus = document.createElement('button');
-            btnPlus.type = 'button';
-            btnPlus.className = 'btn btn-ghost btn-lg';
-            btnPlus.textContent = '+';
-            btnPlus.style.padding = '2px 8px';
-            btnPlus.addEventListener('click', () => changeCartQty(index, 1));
-
-            qtyControls.appendChild(btnMinus);
-            qtyControls.appendChild(spanQty);
-            qtyControls.appendChild(btnPlus);
-            tdQty.appendChild(qtyControls);
-            tr.appendChild(tdQty);
-
-            const tdPrice = document.createElement('td');
-            tdPrice.textContent = formatMoney(item.price);
-            tr.appendChild(tdPrice);
-
-            const tdTotal = document.createElement('td');
-            tdTotal.textContent = formatMoney(item.qty * item.price);
-            tr.appendChild(tdTotal);
-
-            const tdActions = document.createElement('td');
-            const btnRemove = document.createElement('button');
-            btnRemove.type = 'button';
-            btnRemove.className = 'btn btn-ghost btn-lg';
-            btnRemove.textContent = '✕';
-            btnRemove.addEventListener('click', () => removeCartItem(index));
-            tdActions.appendChild(btnRemove);
-            tr.appendChild(tdActions);
-
-            tbody.appendChild(tr);
-        });
-
-        updateSaleTotals();
+        console.error('renderCartTable: pos module not loaded');
     }
 
     function changeCartQty(index, delta) {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.changeCartQty === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
-                window.LitePos.pos.changeCartQty(index, delta);
-                if (window.LitePos.state && window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                return;
-            } catch (e) { console.error(e); }
-        }
-        if (!currentSale || !currentSale.items[index]) return;
-        const item = currentSale.items[index];
-        const newQty = item.qty + delta;
-        if (newQty <= 0) {
-            removeCartItem(index);
+        if (window.LitePos?.pos?.changeCartQty) {
+            if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
+            window.LitePos.pos.changeCartQty(index, delta);
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
             return;
         }
-        const product = db.products.find(p => p.sku === item.sku);
-        if (product && newQty > product.stock) {
-            return showToast('Stock limit', `Only ${product.stock} in stock.`, 'error');
-        }
-        item.qty = newQty;
-        renderCartTable();
+        console.error('changeCartQty: pos module not loaded');
     }
 
     function removeCartItem(index) {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.removeCartItem === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
-                window.LitePos.pos.removeCartItem(index);
-                if (window.LitePos.state && window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.pos?.removeCartItem) {
+            if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
+            window.LitePos.pos.removeCartItem(index);
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
+            return;
         }
-        if (!currentSale || !currentSale.items[index]) return;
-        currentSale.items.splice(index, 1);
-        renderCartTable();
+        console.error('removeCartItem: pos module not loaded');
     }
 
     function addProductToCart(skuOrBarcode) {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.addProductToCart === 'function') {
-            try {
-                if (window.LitePos.state) {
-                    window.LitePos.state.currentSale = currentSale;
-                    window.LitePos.state.db = db;
-                }
-                window.LitePos.pos.addProductToCart(skuOrBarcode);
-                if (window.LitePos.state && window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                resetProductSearchAfterAdd();
-                return;
-            } catch (e) { console.error(e); }
-        }
-        if (!currentSale) {
-            currentSale = createEmptySale();
-            if (window.LitePos && window.LitePos.state) {
+        if (window.LitePos?.pos?.addProductToCart) {
+            if (window.LitePos.state) {
                 window.LitePos.state.currentSale = currentSale;
+                window.LitePos.state.db = db;
             }
+            window.LitePos.pos.addProductToCart(skuOrBarcode);
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
+            resetProductSearchAfterAdd();
+            return;
         }
-        // Find product by SKU or barcode
-        const product = db.products.find(p => p.sku === skuOrBarcode || p.barcode === skuOrBarcode);
-        if (!product) return;
-
-        const existing = currentSale.items.find(it => it.sku === product.sku);
-        const currentQty = existing ? existing.qty : 0;
-        if (currentQty + 1 > product.stock) {
-            return showToast('Stock limit', `Only ${product.stock} in stock.`, 'error');
-        }
-
-        if (existing) {
-            existing.qty += 1;
-        } else {
-            currentSale.items.push({
-                sku: product.sku,
-                name: product.name,
-                qty: 1,
-                price: product.sellPrice,
-                buyPrice: product.buyPrice
-            });
-        }
-        renderCartTable();
-        updateSaleTotals();
-        resetProductSearchAfterAdd();
+        console.error('addProductToCart: pos module not loaded');
     }
 
     function resetProductSearchAfterAdd() {
         let needsRender = false;
-        if (els['product-search']) {
-            if (els['product-search'].value !== '') needsRender = true;
-            els['product-search'].value = '';
-            els['product-search'].focus();
+        if (getElement('product-search')) {
+            if (getElement('product-search').value !== '') needsRender = true;
+            getElement('product-search').value = '';
+            getElement('product-search').focus();
         }
-        if (els['product-overlay']) {
-            els['product-overlay'].classList.add('hidden');
+        if (getElement('product-overlay')) {
+            getElement('product-overlay').classList.add('hidden');
         }
         if (needsRender) {
             renderProductSearchTable();
@@ -1662,87 +1411,20 @@
     // -------------------------
 
     function renderProductSearchTable() {
-        if (window.LitePos && window.LitePos.products && typeof window.LitePos.products.renderProductSearchTable === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.db = db;
-                return window.LitePos.products.renderProductSearchTable();
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.products?.renderProductSearchTable) {
+            if (window.LitePos.state) window.LitePos.state.db = db;
+            return window.LitePos.products.renderProductSearchTable();
         }
-        const tbody = els['product-overlay-body'];
-        tbody.innerHTML = '';
-        const query = (els['product-search'].value || '').trim().toLowerCase();
-
-        const products = db.products || [];
-        const filtered = products.filter(p => {
-            if (!query) return true;
-            const text = (p.name + ' ' + p.sku + ' ' + (p.barcode || '') + ' ' + (p.category || '')).toLowerCase();
-            return text.includes(query);
-        });
-
-        filtered.forEach((p, idx) => {
-            const tr = document.createElement('tr');
-            tr.addEventListener('click', () => addProductToCart(p.sku));
-
-            const tdName = document.createElement('td');
-            tdName.textContent = p.name;
-            tr.appendChild(tdName);
-
-            const tdSku = document.createElement('td');
-            tdSku.textContent = p.sku;
-            tr.appendChild(tdSku);
-
-            const tdBarcode = document.createElement('td');
-            tdBarcode.textContent = p.barcode || '—';
-            tdBarcode.style.fontSize = '12px';
-            tdBarcode.style.color = 'var(--text-soft)';
-            tr.appendChild(tdBarcode);
-
-            const tdCategory = document.createElement('td');
-            tdCategory.textContent = p.category || '—';
-            tdCategory.style.fontSize = '12px';
-            tr.appendChild(tdCategory);
-
-            const tdSell = document.createElement('td');
-            tdSell.textContent = formatMoney(p.sellPrice);
-            tr.appendChild(tdSell);
-
-            const tdStock = document.createElement('td');
-            tdStock.textContent = String(p.stock);
-            if (p.stock <= (p.lowStockAt || 0)) {
-                tdStock.style.color = '#facc15';
-            }
-            tr.appendChild(tdStock);
-
-            const tdBtn = document.createElement('td');
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'btn btn-primary btn-lg';
-            btn.textContent = 'Add';
-            btn.addEventListener('click', ev => {
-                ev.stopPropagation();
-                addProductToCart(p.sku);
-            });
-            tdBtn.appendChild(btn);
-            tr.appendChild(tdBtn);
-
-            tbody.appendChild(tr);
-
-            if (idx === 0) {
-                // not a real focus, just visual
-            }
-        });
+        console.error('renderProductSearchTable: products module not loaded');
     }
 
     window.renderProductSearchTable = renderProductSearchTable;
 
     function focusProductSearch() {
-        if (window.LitePos && window.LitePos.products && typeof window.LitePos.products.focusProductSearch === 'function') {
-            try { return window.LitePos.products.focusProductSearch(); } catch (e) { console.error(e); }
+        if (window.LitePos?.products?.focusProductSearch) {
+            return window.LitePos.products.focusProductSearch();
         }
-        if (els['product-search']) {
-            els['product-search'].focus();
-            els['product-search'].select();
-        }
+        console.error('focusProductSearch: products module not loaded');
     }
 
     // -------------------------
@@ -1775,169 +1457,49 @@
     }
 
     function holdCurrentSale() {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.holdCurrentSale === 'function') {
-            try {
-                if (window.LitePos.state) {
-                    window.LitePos.state.currentSale = currentSale;
-                    window.LitePos.state.db = db;
-                }
-                window.LitePos.pos.holdCurrentSale();
-                if (window.LitePos.state && window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                renderCartTable();
-                updateSaleTotals();
-                renderOpenSalesStrip();
-                return;
-            } catch (e) { console.error(e); }
-        }
-        if (!currentSale || currentSale.items.length === 0) {
-            return showToast('Hold sale', 'Cart is empty.', 'error');
-        }
-        const heldId = persistSaleAsOpen(currentSale);
-        if (!heldId) {
+        if (window.LitePos?.pos?.holdCurrentSale) {
+            if (window.LitePos.state) {
+                window.LitePos.state.currentSale = currentSale;
+                window.LitePos.state.db = db;
+            }
+            window.LitePos.pos.holdCurrentSale();
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
+            renderCartTable();
+            updateSaleTotals();
+            renderOpenSalesStrip();
             return;
         }
-        showToast('Sale held', `Sale ${heldId} saved as open.`, 'success');
-        
-        // Clear auto-save and start a new sale after holding
-        if (window.LitePos && window.LitePos.pos && window.LitePos.pos.clearAutoSave) {
-            window.LitePos.pos.clearAutoSave();
-        }
-        
-        // Start new sale and immediately update open sales list
-        startNewSale(true);
-        renderOpenSalesStrip();
+        console.error('holdCurrentSale: pos module not loaded');
     }
 
     function cancelCurrentSale() {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.cancelCurrentSale === 'function') {
-            try {
-                if (window.LitePos.state) {
-                    window.LitePos.state.currentSale = currentSale;
-                    window.LitePos.state.db = db;
-                }
-                window.LitePos.pos.cancelCurrentSale();
-                if (window.LitePos.state && window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                return;
-            } catch (e) { console.error(e); }
-        }
-        if (!currentSale || !currentSale.id) {
-            startNewSale();
-            showToast('Sale cleared', 'Cancelled unsaved sale.', 'success');
+        if (window.LitePos?.pos?.cancelCurrentSale) {
+            if (window.LitePos.state) {
+                window.LitePos.state.currentSale = currentSale;
+                window.LitePos.state.db = db;
+            }
+            window.LitePos.pos.cancelCurrentSale();
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
             return;
         }
-        const idx = db.sales.findIndex(s => s.id === currentSale.id && s.status === 'open');
-        if (idx === -1) {
-            startNewSale();
-            return;
-        }
-        if (!confirm(`Cancel open sale ${currentSale.id}? It will be removed.`)) return;
-        db.sales.splice(idx, 1);
-        saveDb();
-        startNewSale();
-        renderOpenSalesStrip();
-        showToast('Sale cancelled', 'Open sale removed.', 'success');
+        console.error('cancelCurrentSale: pos module not loaded');
     }
 
     function completeCurrentSale() {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.completeCurrentSale === 'function') {
-            try {
-                if (window.LitePos.state) {
-                    window.LitePos.state.currentSale = currentSale;
-                    window.LitePos.state.currentUser = currentUser;
-                    window.LitePos.state.db = db;
-                }
-                window.LitePos.pos.completeCurrentSale();
-                if (window.LitePos.state) {
-                    if (window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                    if (window.LitePos.state.lastClosedSaleId) lastClosedSaleId = window.LitePos.state.lastClosedSaleId;
-                }
-                return;
-            } catch (e) { console.error(e); }
-        }
-        if (!currentSale || currentSale.items.length === 0) {
-            return showToast('Complete sale', 'Cart is empty.', 'error');
-        }
-        if (!currentSale.customer) {
-            // Auto attach default walk-in
-            const walkIn = db.customers.find(c => c.phone === '') || db.customers[0];
-            setCurrentCustomer(walkIn || null);
-        }
-        updateSaleTotals();
-
-        if (currentSale.total <= 0) {
-            return showToast('Complete sale', 'Total must be greater than 0.', 'error');
-        }
-        if ((currentSale.payment || 0) < currentSale.total) {
-            return showToast('Payment insufficient', 'Payment must cover total.', 'error');
-        }
-
-        const now = new Date().toISOString();
-        currentSale.status = 'closed';
-        currentSale.updatedAt = now;
-        if (!currentSale.createdAt) currentSale.createdAt = now;
-
-        // Ensure sale has ID
-        if (!currentSale.id) {
-            const newId = 'S' + String(db.counters.nextSaleId++).padStart(4, '0');
-            currentSale.id = newId;
-        }
-
-        // Deduct stock
-        currentSale.items.forEach(it => {
-            const product = db.products.find(p => p.sku === it.sku);
-            if (product) {
-                product.stock = Math.max(0, (product.stock || 0) - it.qty);
+        if (window.LitePos?.pos?.completeCurrentSale) {
+            if (window.LitePos.state) {
+                window.LitePos.state.currentSale = currentSale;
+                window.LitePos.state.currentUser = currentUser;
+                window.LitePos.state.db = db;
             }
-        });
-
-        // Persist sale
-        const idx = db.sales.findIndex(s => s.id === currentSale.id);
-        const saleCopy = structuredCloneSale(currentSale);
-        db.sales[idx === -1 ? db.sales.length : idx] = saleCopy;
-
-        // Update customer stats
-        if (currentSale.customer && currentSale.customer.phone != null) {
-            let customer = db.customers.find(c => c.phone === currentSale.customer.phone);
-            if (!customer) {
-                customer = {
-                    id: 'c' + (db.customers.length + 1),
-                    name: currentSale.customer.name || 'Customer',
-                    phone: currentSale.customer.phone,
-                    notes: currentSale.customer.notes || '',
-                    lastSaleAt: null,
-                    lastSaleTotal: 0
-                };
-                db.customers.push(customer);
-            } else {
-                // update name if changed
-                if (currentSale.customer.name) {
-                    customer.name = currentSale.customer.name;
-                }
+            window.LitePos.pos.completeCurrentSale();
+            if (window.LitePos.state) {
+                if (window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
+                if (window.LitePos.state.lastClosedSaleId) lastClosedSaleId = window.LitePos.state.lastClosedSaleId;
             }
-            customer.lastSaleAt = now;
-            customer.lastSaleTotal = currentSale.total;
+            return;
         }
-
-        saveDb();
-        lastClosedSaleId = currentSale.id;
-        els['summary-sale-status'].textContent = `Closed · ${currentSale.id}`;
-        if (els['summary-sale-id-value']) els['summary-sale-id-value'].textContent = currentSale.id;
-        showToast('Sale completed', `Sale ${currentSale.id} closed.`, 'success');
-
-        // Update UI bits
-        renderCartTable();
-        renderOpenSalesStrip();
-        renderProductsTable();
-        renderCustomersTable();
-        refreshKpis();
-        renderSalesTable();
-
-        // Fill receipt preview
-        fillReceiptFromSale(saleCopy);
-
-        // Prepare for next sale
-        startNewSale();
-        renderTodaySnapshot();
+        console.error('completeCurrentSale: pos module not loaded');
     }
 
     function structuredCloneSale(s) {
@@ -1945,7 +1507,7 @@
     }
 
     function renderOpenSalesStrip() {
-        const container = els['open-sales-list'];
+        const container = getElement('open-sales-list');
         const card = document.getElementById('open-sales-card');
         if (!container || !card) return;
         container.innerHTML = '';
@@ -1955,16 +1517,16 @@
         // Hide card if no open sales
         if (openSales.length === 0) {
             if (card) card.classList.add('hidden');
-            if (els['kpi-open-sales']) {
-                els['kpi-open-sales'].textContent = '0';
+            if (getElement('kpi-open-sales')) {
+                getElement('kpi-open-sales').textContent = '0';
             }
             return;
         }
         
         // Show card if we have open sales
         if (card) card.classList.remove('hidden');
-        if (els['kpi-open-sales']) {
-            els['kpi-open-sales'].textContent = String(openSales.length);
+        if (getElement('kpi-open-sales')) {
+            getElement('kpi-open-sales').textContent = String(openSales.length);
         }
         
         openSales.sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''));
@@ -2068,49 +1630,16 @@
     }
 
     function loadOpenSale(saleId) {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.loadOpenSale === 'function') {
-            try {
-                if (window.LitePos.state) {
-                    window.LitePos.state.currentSale = currentSale;
-                    window.LitePos.state.db = db;
-                }
-                window.LitePos.pos.loadOpenSale(saleId);
-                if (window.LitePos.state && window.LitePos.state.currentSale) currentSale = window.LitePos.state.currentSale;
-                return;
-            } catch (e) { console.error(e); }
-        }
-        const sale = db.sales.find(s => s.id === saleId && s.status === 'open');
-        if (!sale) {
-            return showToast('Open sale', 'Held sale not found.', 'error');
-        }
-
-        const activeSaleId = currentSale && currentSale.id ? currentSale.id : null;
-        const activeHasItems = currentSale && Array.isArray(currentSale.items) && currentSale.items.length > 0;
-        if (activeSaleId === saleId && activeHasItems) {
-            return showToast('Open sale', `Sale ${saleId} is already in the cart.`, 'info');
-        }
-
-        if (activeHasItems && (!activeSaleId || activeSaleId !== saleId)) {
-            const stashedId = persistSaleAsOpen(currentSale);
-            if (stashedId) {
-                showToast('Sale held', `Sale ${stashedId} saved before switching.`, 'info');
+        if (window.LitePos?.pos?.loadOpenSale) {
+            if (window.LitePos.state) {
+                window.LitePos.state.currentSale = currentSale;
+                window.LitePos.state.db = db;
             }
+            window.LitePos.pos.loadOpenSale(saleId);
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
+            return;
         }
-
-        currentSale = structuredCloneSale(sale);
-        currentSale.status = 'open';
-        if (window.LitePos && window.LitePos.state) {
-            window.LitePos.state.currentSale = currentSale;
-        }
-        setCurrentCustomer(currentSale.customer || null);
-        renderCartTable();
-        updateSaleTotals();
-        els['summary-sale-status'].textContent = `Open · ${sale.id}`;
-        if (els['summary-sale-id-value']) els['summary-sale-id-value'].textContent = sale.id;
-        switchTab('tab-sale');
-        renderOpenSalesStrip();
-        focusProductSearch();
-        showToast('Open sale', `Resumed ${sale.id}.`, 'success');
+        console.error('loadOpenSale: pos module not loaded');
     }
 
     function loadSaleForEditing(saleId) {
@@ -2142,9 +1671,14 @@
         renderCartTable();
         updateSaleTotals();
         
-        const statusLabel = sale.status === 'closed' ? 'Editing Closed' : (sale.status === 'open' ? 'Editing Open' : 'Editing');
-        els['summary-sale-status'].textContent = `${statusLabel} · ${sale.id}`;
-        if (els['summary-sale-id-value']) els['summary-sale-id-value'].textContent = sale.id;
+        const statusLabel = sale.status === 'closed' ? 'Editing Closed Sale' : (sale.status === 'open' ? 'Editing Open Sale' : 'Editing Sale');
+        getElement('summary-sale-status').textContent = `${statusLabel} · ${sale.id}`;
+        if (getElement('summary-sale-id-value')) getElement('summary-sale-id-value').textContent = sale.id;
+        
+        // Update action buttons visibility
+        if (window.LitePos?.pos?.updateActionButtonsVisibility) {
+            window.LitePos.pos.updateActionButtonsVisibility();
+        }
         
         switchTab('tab-sale');
         focusProductSearch();
@@ -2158,56 +1692,12 @@
     // -------------------------
 
     function fillReceiptFromSale(sale) {
-        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.fillReceiptFromSale === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.db = db;
-                window.LitePos.pos.fillReceiptFromSale(sale);
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.pos?.fillReceiptFromSale) {
+            if (window.LitePos.state) window.LitePos.state.db = db;
+            window.LitePos.pos.fillReceiptFromSale(sale);
+            return;
         }
-        els['receipt-shop-name'].textContent = db.shop.name || 'Shop';
-        els['receipt-shop-address'].textContent = db.shop.address || '';
-        els['receipt-shop-phone'].textContent = db.shop.phone || '';
-
-        const customerName = sale.customer && sale.customer.name
-            ? sale.customer.name
-            : 'Walk-in';
-        const customerPhone = sale.customer && sale.customer.phone
-            ? sale.customer.phone
-            : '—';
-        const dt = new Date(sale.createdAt || new Date());
-        const metaText = [
-            `Invoice: ${sale.id}`,
-            `Date: ${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-            `Customer: ${customerName}`,
-            `Phone: ${customerPhone}`
-        ].join(' | ');
-        els['receipt-sale-meta'].textContent = metaText;
-
-        const tbody = els['receipt-items-body'];
-        tbody.innerHTML = '';
-        sale.items.forEach(it => {
-            const tr = document.createElement('tr');
-            const tdName = document.createElement('td');
-            tdName.textContent = it.name;
-            const tdQty = document.createElement('td');
-            tdQty.textContent = String(it.qty);
-            const tdPrice = document.createElement('td');
-            tdPrice.textContent = formatMoney(it.price);
-            const tdTotal = document.createElement('td');
-            tdTotal.textContent = formatMoney(it.qty * it.price);
-            tr.appendChild(tdName);
-            tr.appendChild(tdQty);
-            tr.appendChild(tdPrice);
-            tr.appendChild(tdTotal);
-            tbody.appendChild(tr);
-        });
-
-        els['receipt-subtotal'].textContent = formatMoney(sale.subtotal || 0);
-        els['receipt-discount'].textContent = formatMoney(sale.discount || 0);
-        els['receipt-total'].textContent = formatMoney(sale.total || 0);
-        els['receipt-payment'].textContent = formatMoney(sale.payment || 0);
-        els['receipt-change'].textContent = formatMoney(sale.change || 0);
+        console.error('fillReceiptFromSale: pos module not loaded');
     }
 
     function printLastReceipt() {
@@ -2233,7 +1723,7 @@
 
         fillReceiptFromSale(sale);
 
-        const size = els['receipt-size'].value || 'a4';
+        const size = getElement('receipt-size').value || 'a4';
         document.body.classList.add('print-receipt');
         document.body.classList.add(
             size === '80mm' ? 'receipt-80mm' :
@@ -2253,140 +1743,36 @@
     // -------------------------
 
     function renderCustomersTable() {
-        if (window.LitePos && window.LitePos.customers && typeof window.LitePos.customers.renderCustomersTable === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.db = db;
-                window.LitePos.customers.renderCustomersTable();
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.customers?.renderCustomersTable) {
+            if (window.LitePos.state) window.LitePos.state.db = db;
+            return window.LitePos.customers.renderCustomersTable();
         }
-        const tbody = els['customers-table-body'];
-        if (!tbody) {
-            console.error('[renderCustomersTable] tbody element not found!');
-            return;
-        }
-        tbody.innerHTML = '';
-        const query = (els['customer-search'].value || '').trim().toLowerCase();
-        const customers = db.customers || [];
-
-        customers
-            .slice()
-            .sort((a, b) => (b.lastSaleAt || '').localeCompare(a.lastSaleAt || ''))
-            .forEach(c => {
-                if (query) {
-                    const text = (c.name + ' ' + c.phone + ' ' + (c.notes || '')).toLowerCase();
-                    if (!text.includes(query)) return;
-                }
-
-                const tr = document.createElement('tr');
-                tr.addEventListener('click', () => loadCustomerToForm(c.id));
-
-                const tdName = document.createElement('td');
-                tdName.textContent = c.name;
-                tr.appendChild(tdName);
-
-                const tdPhone = document.createElement('td');
-                tdPhone.textContent = c.phone || '—';
-                tdPhone.style.textAlign = 'center';
-                tr.appendChild(tdPhone);
-
-                const tdNotes = document.createElement('td');
-                tdNotes.textContent = c.notes || '';
-                tr.appendChild(tdNotes);
-
-                const tdLast = document.createElement('td');
-                if (c.lastSaleAt) {
-                    const d = new Date(c.lastSaleAt);
-                    tdLast.textContent = `${d.toLocaleDateString()} · ${formatMoney(c.lastSaleTotal || 0)}`;
-                } else {
-                    tdLast.textContent = '—';
-                }
-                tr.appendChild(tdLast);
-
-                tbody.appendChild(tr);
-            });
+        console.error('[core.js] renderCustomersTable: customers module not loaded');
     }
 
     function loadCustomerToForm(id) {
-        if (window.LitePos && window.LitePos.customers && typeof window.LitePos.customers.loadCustomerToForm === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.db = db;
-                window.LitePos.customers.loadCustomerToForm(id);
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.customers?.loadCustomerToForm) {
+            if (window.LitePos.state) window.LitePos.state.db = db;
+            return window.LitePos.customers.loadCustomerToForm(id);
         }
-        const c = db.customers.find(cu => cu.id === id);
-        if (!c) return;
-        els['customer-edit-name'].value = c.name;
-        els['customer-edit-phone'].value = c.phone;
-        els['customer-edit-address'].value = c.address || '';
-        els['customer-edit-notes'].value = c.notes || '';
-        els['customer-edit-name'].dataset.customerId = c.id;
+        console.error('[core.js] loadCustomerToForm: customers module not loaded');
     }
 
     function clearCustomerForm() {
-        if (window.LitePos && window.LitePos.customers && typeof window.LitePos.customers.clearCustomerForm === 'function') {
-            try {
-                window.LitePos.customers.clearCustomerForm();
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.customers?.clearCustomerForm) {
+            return window.LitePos.customers.clearCustomerForm();
         }
-        els['customer-edit-name'].value = '';
-        els['customer-edit-phone'].value = '';
-        els['customer-edit-address'].value = '';
-        els['customer-edit-notes'].value = '';
-        delete els['customer-edit-name'].dataset.customerId;
+        console.error('[core.js] clearCustomerForm: customers module not loaded');
     }
 
     function saveCustomerFromForm() {
-        if (window.LitePos && window.LitePos.customers && typeof window.LitePos.customers.saveCustomerFromForm === 'function') {
-            try {
-                if (window.LitePos.state) window.LitePos.state.db = db;
-                window.LitePos.customers.saveCustomerFromForm();
-                if (window.LitePos.state && window.LitePos.state.db) db = window.LitePos.state.db;
-                return;
-            } catch (e) { console.error(e); }
+        if (window.LitePos?.customers?.saveCustomerFromForm) {
+            if (window.LitePos.state) window.LitePos.state.db = db;
+            window.LitePos.customers.saveCustomerFromForm();
+            if (window.LitePos.state?.db) db = window.LitePos.state.db;
+            return;
         }
-        const name = els['customer-edit-name'].value.trim();
-        const phone = (els['customer-edit-phone'].value || '').trim();
-        const address = (els['customer-edit-address'].value || '').trim();
-        const notes = (els['customer-edit-notes'].value || '').trim();
-        if (!name) return showToast('Customer', 'Name is required.', 'error');
-
-        const existingId = els['customer-edit-name'].dataset.customerId;
-        let customer;
-        if (existingId) {
-            customer = db.customers.find(c => c.id === existingId);
-        }
-
-        // Unique phone check
-        if (phone) {
-            const dup = db.customers.find(c => c.phone === phone && c.id !== existingId);
-            if (dup) {
-                return showToast('Customer', 'Another customer already uses this phone.', 'error');
-            }
-        }
-
-        if (customer) {
-            customer.name = name;
-            customer.phone = phone;
-            customer.address = address;
-            customer.notes = notes;
-        } else {
-            customer = {
-                id: 'c' + (db.customers.length + 1),
-                name,
-                phone,
-                address,
-                notes,
-                lastSaleAt: null,
-                lastSaleTotal: 0
-            };
-            db.customers.push(customer);
-        }
-        saveDb();
-        renderCustomersTable();
-        showToast('Customer saved', `${customer.name}`, 'success');
+        console.error('[core.js] saveCustomerFromForm: customers module not loaded');
     }
 
     // -------------------------
@@ -2394,336 +1780,48 @@
     // -------------------------
 
     function renderProductsTable() {
-        if (window.LitePos && window.LitePos.products && typeof window.LitePos.products.renderProductsTable === 'function') {
-            try { return window.LitePos.products.renderProductsTable(); } catch (e) { console.error(e); }
+        if (window.LitePos?.products?.renderProductsTable) {
+            if (window.LitePos.state) window.LitePos.state.db = db;
+            return window.LitePos.products.renderProductsTable();
         }
-        const tbody = els['products-table-body'];
-        tbody.innerHTML = '';
-        const query = (els['product-manage-search'].value || '').trim().toLowerCase();
-        const categoryFilter = els['product-filter-category'] ? els['product-filter-category'].value : '';
-        const brandFilter = els['product-filter-brand'] ? els['product-filter-brand'].value : '';
-        const supplierFilter = els['product-filter-supplier'] ? els['product-filter-supplier'].value : '';
-        const lowStockOnly = els['product-filter-low-stock'] ? els['product-filter-low-stock'].checked : false;
-        const sortBy = els['product-sort'] ? els['product-sort'].value : 'name-asc';
-
-        // Filter products
-        let filtered = db.products.slice();
-        
-        if (query) {
-            filtered = filtered.filter(p => {
-                const txt = (p.name + ' ' + p.sku + ' ' + (p.barcode || '') + ' ' + (p.category || '') + ' ' + (p.brand || '') + ' ' + (p.supplier || '')).toLowerCase();
-                return txt.includes(query);
-            });
-        }
-        
-        if (categoryFilter) {
-            filtered = filtered.filter(p => p.category === categoryFilter);
-        }
-        
-        if (brandFilter) {
-            filtered = filtered.filter(p => p.brand === brandFilter);
-        }
-        
-        if (supplierFilter) {
-            filtered = filtered.filter(p => p.supplier === supplierFilter);
-        }
-        
-        if (lowStockOnly) {
-            filtered = filtered.filter(p => p.stock <= (p.lowStockAt || 0));
-        }
-        
-        // Apply sorting
-        const [sortField, sortDir] = sortBy.split('-');
-        filtered.sort((a, b) => {
-            let valA, valB;
-            if (sortField === 'name') {
-                valA = a.name.toLowerCase();
-                valB = b.name.toLowerCase();
-                return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-            } else if (sortField === 'buy') {
-                valA = a.buyPrice || 0;
-                valB = b.buyPrice || 0;
-            } else if (sortField === 'sell') {
-                valA = a.sellPrice || 0;
-                valB = b.sellPrice || 0;
-            } else if (sortField === 'stock') {
-                valA = a.stock || 0;
-                valB = b.stock || 0;
-            }
-            return sortDir === 'asc' ? valA - valB : valB - valA;
-        });
-
-        // Update total count and badge
-        if (els['product-total-count']) {
-            if (lowStockOnly && filtered.length === 0) {
-                els['product-total-count'].textContent = 'No low stock items';
-            } else if (lowStockOnly) {
-                els['product-total-count'].textContent = `${filtered.length} low stock ${filtered.length === 1 ? 'item' : 'items'} | Showing page ${currentProductsPage} of ${Math.max(1, Math.ceil(filtered.length / productsPerPage))}`;
-            } else {
-                els['product-total-count'].textContent = `${filtered.length} total | Showing page ${currentProductsPage} of ${Math.max(1, Math.ceil(filtered.length / productsPerPage))}`;
-            }
-        }
-        if (els['product-count-badge']) {
-            els['product-count-badge'].textContent = `${db.products.length} products`;
-        }
-
-        // Pagination
-        const totalProducts = filtered.length;
-        const totalPages = Math.max(1, Math.ceil(totalProducts / productsPerPage));
-        
-        // Clamp current page
-        if (currentProductsPage > totalPages) currentProductsPage = totalPages;
-        if (currentProductsPage < 1) currentProductsPage = 1;
-        
-        const startIdx = (currentProductsPage - 1) * productsPerPage;
-        const endIdx = startIdx + productsPerPage;
-        const pageProducts = filtered.slice(startIdx, endIdx);
-
-        // Update pagination UI - removed duplicate display
-        if (els['btn-product-prev-page']) {
-            els['btn-product-prev-page'].disabled = currentProductsPage <= 1;
-        }
-        if (els['btn-product-next-page']) {
-            els['btn-product-next-page'].disabled = currentProductsPage >= totalPages;
-        }
-
-        // Render products
-        pageProducts.forEach(p => {
-            const tr = document.createElement('tr');
-            if (p.stock <= (p.lowStockAt || 0)) {
-                tr.classList.add('low-stock-row');
-            }
-            tr.addEventListener('click', () => loadProductToForm(p.id));
-
-            const tdId = document.createElement('td');
-            tdId.textContent = formatProductId(p.id);
-            tdId.style.fontFamily = 'monospace';
-            tdId.style.fontSize = '12px';
-            tdId.style.color = 'var(--text-soft)';
-            tr.appendChild(tdId);
-
-            const tdName = document.createElement('td');
-            tdName.textContent = p.name;
-            tr.appendChild(tdName);
-
-            const tdSku = document.createElement('td');
-            tdSku.textContent = p.sku;
-            tr.appendChild(tdSku);
-
-            const tdBarcode = document.createElement('td');
-            tdBarcode.textContent = p.barcode || '—';
-            tdBarcode.style.fontSize = '12px';
-            tr.appendChild(tdBarcode);
-
-            const tdCategory = document.createElement('td');
-            tdCategory.textContent = p.category || '—';
-            tdCategory.style.fontSize = '12px';
-            tr.appendChild(tdCategory);
-
-            const tdBrand = document.createElement('td');
-            tdBrand.textContent = p.brand || '—';
-            tdBrand.style.fontSize = '12px';
-            tr.appendChild(tdBrand);
-
-            const tdSupplier = document.createElement('td');
-            tdSupplier.textContent = p.supplier || '—';
-            tdSupplier.style.fontSize = '12px';
-            tr.appendChild(tdSupplier);
-
-            const tdBuy = document.createElement('td');
-            tdBuy.textContent = formatMoney(p.buyPrice);
-            tr.appendChild(tdBuy);
-
-            const tdSell = document.createElement('td');
-            tdSell.textContent = formatMoney(p.sellPrice);
-            tr.appendChild(tdSell);
-
-            const tdStock = document.createElement('td');
-            tdStock.textContent = String(p.stock);
-            tr.appendChild(tdStock);
-
-            const tdLow = document.createElement('td');
-            tdLow.textContent = p.stock <= (p.lowStockAt || 0) ? 'Yes' : '';
-            tr.appendChild(tdLow);
-
-            tbody.appendChild(tr);
-        });
-        
-        // Update dropdowns and datalists
-        updateCategorySuggestions();
-        updateBrandSuggestions();
-        updateSupplierSuggestions();
+        console.error('[core.js] renderProductsTable: products module not loaded');
     }
     
     function updateCategorySuggestions() {
-        // Update category filter dropdown
-        if (els['product-filter-category']) {
-            const categories = [...new Set(db.products.map(p => p.category).filter(c => c))].sort();
-            const currentValue = els['product-filter-category'].value;
-            els['product-filter-category'].innerHTML = '<option value="">All Categories</option>';
-            categories.forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat;
-                opt.textContent = cat;
-                els['product-filter-category'].appendChild(opt);
-            });
-            els['product-filter-category'].value = currentValue;
-        }
-        
-        // Update category datalist for autocomplete
-        if (els['category-suggestions']) {
-            const categories = [...new Set(db.products.map(p => p.category).filter(c => c))].sort();
-            els['category-suggestions'].innerHTML = '';
-            categories.forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat;
-                els['category-suggestions'].appendChild(opt);
-            });
+        if (window.LitePos?.products?.updateCategorySuggestions) {
+            return window.LitePos.products.updateCategorySuggestions();
         }
     }
 
     function updateBrandSuggestions() {
-        // Update brand filter dropdown
-        if (els['product-filter-brand']) {
-            const brands = [...new Set(db.products.map(p => p.brand).filter(b => b))].sort();
-            const currentValue = els['product-filter-brand'].value;
-            els['product-filter-brand'].innerHTML = '<option value="">All Brands</option>';
-            brands.forEach(brand => {
-                const opt = document.createElement('option');
-                opt.value = brand;
-                opt.textContent = brand;
-                els['product-filter-brand'].appendChild(opt);
-            });
-            els['product-filter-brand'].value = currentValue;
-        }
-        
-        // Update brand datalist for autocomplete
-        const datalist = document.getElementById('brand-suggestions');
-        if (datalist) {
-            const brands = [...new Set(db.products.map(p => p.brand).filter(b => b))].sort();
-            datalist.innerHTML = '';
-            brands.forEach(brand => {
-                const opt = document.createElement('option');
-                opt.value = brand;
-                datalist.appendChild(opt);
-            });
+        if (window.LitePos?.products?.updateBrandSuggestions) {
+            return window.LitePos.products.updateBrandSuggestions();
         }
     }
 
     function updateSupplierSuggestions() {
-        // Update supplier filter dropdown
-        if (els['product-filter-supplier']) {
-            const suppliers = [...new Set(db.products.map(p => p.supplier).filter(s => s))].sort();
-            const currentValue = els['product-filter-supplier'].value;
-            els['product-filter-supplier'].innerHTML = '<option value="">All Suppliers</option>';
-            suppliers.forEach(supplier => {
-                const opt = document.createElement('option');
-                opt.value = supplier;
-                opt.textContent = supplier;
-                els['product-filter-supplier'].appendChild(opt);
-            });
-            els['product-filter-supplier'].value = currentValue;
-        }
-        
-        // Update supplier datalist for autocomplete
-        const datalist = document.getElementById('supplier-suggestions');
-        if (datalist) {
-            const suppliers = [...new Set(db.products.map(p => p.supplier).filter(s => s))].sort();
-            datalist.innerHTML = '';
-            suppliers.forEach(supplier => {
-                const opt = document.createElement('option');
-                opt.value = supplier;
-                datalist.appendChild(opt);
-            });
+        if (window.LitePos?.products?.updateSupplierSuggestions) {
+            return window.LitePos.products.updateSupplierSuggestions();
         }
     }
 
     function loadProductToForm(id) {
-        if (window.LitePos && window.LitePos.products && typeof window.LitePos.products.loadProductToForm === 'function') {
-            try { return window.LitePos.products.loadProductToForm(id); } catch (e) { console.error(e); }
+        if (window.LitePos?.products?.loadProductToForm) {
+            if (window.LitePos.state) window.LitePos.state.db = db;
+            return window.LitePos.products.loadProductToForm(id);
         }
-        const p = db.products.find(p => p.id === id);
-        if (!p) return;
-        els['product-edit-name'].value = p.name;
-        els['product-edit-sku'].value = p.sku;
-        if (els['product-edit-barcode']) els['product-edit-barcode'].value = p.barcode || '';
-        if (els['product-edit-category']) els['product-edit-category'].value = p.category || '';
-        if (els['product-edit-brand']) els['product-edit-brand'].value = p.brand || '';
-        if (els['product-edit-supplier']) els['product-edit-supplier'].value = p.supplier || '';
-        els['product-edit-buy'].value = p.buyPrice;
-        els['product-edit-sell'].value = p.sellPrice;
-        els['product-edit-stock'].value = p.stock;
-        
-        // Disable stock input for existing products
-        if (els['product-edit-stock']) {
-            els['product-edit-stock'].disabled = true;
-            els['product-edit-stock'].style.backgroundColor = 'var(--bg-soft)';
-            els['product-edit-stock'].style.cursor = 'not-allowed';
-        }
-        
-        // Show stock adjustment card and updates log
-        if (els['stock-adjustment-card']) {
-            els['stock-adjustment-card'].style.display = 'block';
-            if (els['stock-current-value']) {
-                els['stock-current-value'].textContent = p.stock;
-            }
-            // Set today's date
-            if (els['stock-adjustment-date']) {
-                els['stock-adjustment-date'].value = new Date().toISOString().split('T')[0];
-            }
-        }
-        if (els['stock-updates-card']) {
-            els['stock-updates-card'].style.display = 'block';
-            renderStockUpdatesTable(id);
-        }
-        els['product-edit-low'].value = p.lowStockAt || 0;
-        els['product-edit-name'].dataset.productId = p.id;
-        
-        // Show delete button for existing products
-        if (els['btn-delete-product']) {
-            els['btn-delete-product'].style.display = 'inline-block';
-        }
+        console.error('[core.js] loadProductToForm: products module not loaded');
     }
 
     function clearProductForm() {
-        if (window.LitePos && window.LitePos.products && typeof window.LitePos.products.clearProductForm === 'function') {
-            try { return window.LitePos.products.clearProductForm(); } catch (e) { console.error(e); }
+        if (window.LitePos?.products?.clearProductForm) {
+            return window.LitePos.products.clearProductForm();
         }
-        els['product-edit-name'].value = '';
-        els['product-edit-sku'].value = '';
-        if (els['product-edit-barcode']) els['product-edit-barcode'].value = '';
-        if (els['product-edit-category']) els['product-edit-category'].value = '';
-        if (els['product-edit-brand']) els['product-edit-brand'].value = '';
-        if (els['product-edit-supplier']) els['product-edit-supplier'].value = '';
-        els['product-edit-buy'].value = '';
-        els['product-edit-sell'].value = '';
-        els['product-edit-stock'].value = '';
-        
-        // Re-enable stock input for new products
-        if (els['product-edit-stock']) {
-            els['product-edit-stock'].disabled = false;
-            els['product-edit-stock'].style.backgroundColor = '';
-            els['product-edit-stock'].style.cursor = '';
-        }
-        
-        // Hide stock adjustment and updates cards
-        if (els['stock-adjustment-card']) els['stock-adjustment-card'].style.display = 'none';
-        if (els['stock-updates-card']) els['stock-updates-card'].style.display = 'none';
-        
-        // Clear stock adjustment form
-        if (els['stock-adjustment-qty']) els['stock-adjustment-qty'].value = '';
-        if (els['stock-adjustment-note']) els['stock-adjustment-note'].value = '';
-        els['product-edit-low'].value = '';
-        delete els['product-edit-name'].dataset.productId;
-        
-        // Hide delete button for new products
-        if (els['btn-delete-product']) {
-            els['btn-delete-product'].style.display = 'none';
-        }
+        console.error('[core.js] clearProductForm: products module not loaded');
     }
 
     function deleteProduct() {
-        const productId = els['product-edit-name'].dataset.productId;
+        const productId = getElement('product-edit-name').dataset.productId;
         if (!productId) {
             return showToast('Error', 'No product selected to delete.', 'error');
         }
@@ -2758,81 +1856,13 @@
     }
 
     function saveProductFromForm() {
-        if (window.LitePos && window.LitePos.products && typeof window.LitePos.products.saveProductFromForm === 'function') {
-            try { return window.LitePos.products.saveProductFromForm(); } catch (e) { console.error(e); }
+        if (window.LitePos?.products?.saveProductFromForm) {
+            if (window.LitePos.state) window.LitePos.state.db = db;
+            window.LitePos.products.saveProductFromForm();
+            if (window.LitePos.state?.db) db = window.LitePos.state.db;
+            return;
         }
-        const name = els['product-edit-name'].value.trim();
-        const sku = els['product-edit-sku'].value.trim();
-        const barcode = els['product-edit-barcode'] ? els['product-edit-barcode'].value.trim() : '';
-        const category = els['product-edit-category'] ? els['product-edit-category'].value.trim() : '';
-        const brand = els['product-edit-brand'] ? els['product-edit-brand'].value.trim() : '';
-        const supplier = els['product-edit-supplier'] ? els['product-edit-supplier'].value.trim() : '';
-        const buy = parseMoneyInput(els['product-edit-buy'].value);
-        const sell = parseMoneyInput(els['product-edit-sell'].value);
-        const stock = parseInt(els['product-edit-stock'].value || '0', 10);
-        const low = parseInt(els['product-edit-low'].value || '0', 10);
-
-        if (!name || !sku) {
-            return showToast('Product', 'Name & SKU are required.', 'error');
-        }
-        if (sell < buy) {
-            showToast('Warning', 'Selling price is below buying price.', 'error');
-        }
-
-        const existingId = els['product-edit-name'].dataset.productId;
-        let product;
-        if (existingId) {
-            product = db.products.find(p => p.id === existingId);
-        }
-
-        // Unique SKU
-        const dup = db.products.find(p => p.sku === sku && p.id !== existingId);
-        if (dup) {
-            return showToast('Product', 'Another product already uses this SKU.', 'error');
-        }
-        
-        // Unique Barcode (if provided)
-        if (barcode) {
-            const barcodeDup = db.products.find(p => p.barcode === barcode && p.id !== existingId);
-            if (barcodeDup) {
-                return showToast('Product', 'Another product already uses this barcode.', 'error');
-            }
-        }
-
-        if (product) {
-            product.name = name;
-            product.sku = sku;
-            product.barcode = barcode;
-            product.category = category;
-            product.brand = brand;
-            product.supplier = supplier;
-            product.buyPrice = buy;
-            product.sellPrice = sell;
-            product.stock = stock;
-            product.lowStockAt = low;
-        } else {
-            product = {
-                id: 'p' + (db.products.length + 1),
-                name,
-                sku,
-                barcode,
-                category,
-                brand,
-                supplier,
-                buyPrice: buy,
-                sellPrice: sell,
-                stock,
-                lowStockAt: low,
-                createdAt: new Date().toISOString()
-            };
-            db.products.push(product);
-        }
-
-        saveDb();
-        renderProductsTable();
-        renderProductSearchTable();
-        clearProductForm();
-        showToast('Product saved', `${product.name}`, 'success');
+        console.error('[core.js] saveProductFromForm: products module not loaded');
     }
     
     // -------------------------
@@ -2840,7 +1870,7 @@
     // -------------------------
     
     function saveStockAdjustment() {
-        const productId = els['product-edit-name'].dataset.productId;
+        const productId = getElement('product-edit-name').dataset.productId;
         if (!productId) {
             return showToast('Error', 'No product selected.', 'error');
         }
@@ -2850,9 +1880,9 @@
             return showToast('Error', 'Product not found.', 'error');
         }
         
-        const qtyChange = parseInt(els['stock-adjustment-qty'].value || '0', 10);
-        const date = els['stock-adjustment-date'].value || new Date().toISOString().split('T')[0];
-        const note = (els['stock-adjustment-note'].value || '').trim();
+        const qtyChange = parseInt(getElement('stock-adjustment-qty').value || '0', 10);
+        const date = getElement('stock-adjustment-date').value || new Date().toISOString().split('T')[0];
+        const note = (getElement('stock-adjustment-note').value || '').trim();
         
         if (qtyChange === 0) {
             return showToast('Stock Adjustment', 'Adjustment quantity cannot be zero.', 'error');
@@ -2894,18 +1924,18 @@
         renderStockUpdatesTable(productId);
         
         // Update current stock display
-        if (els['stock-current-value']) {
-            els['stock-current-value'].textContent = newStock;
+        if (getElement('stock-current-value')) {
+            getElement('stock-current-value').textContent = newStock;
         }
-        if (els['product-edit-stock']) {
-            els['product-edit-stock'].value = newStock;
+        if (getElement('product-edit-stock')) {
+            getElement('product-edit-stock').value = newStock;
         }
         
         // Clear adjustment form
-        if (els['stock-adjustment-qty']) els['stock-adjustment-qty'].value = '';
-        if (els['stock-adjustment-note']) els['stock-adjustment-note'].value = '';
-        if (els['stock-adjustment-date']) {
-            els['stock-adjustment-date'].value = new Date().toISOString().split('T')[0];
+        if (getElement('stock-adjustment-qty')) getElement('stock-adjustment-qty').value = '';
+        if (getElement('stock-adjustment-note')) getElement('stock-adjustment-note').value = '';
+        if (getElement('stock-adjustment-date')) {
+            getElement('stock-adjustment-date').value = new Date().toISOString().split('T')[0];
         }
         
         showToast('Stock Updated', `${qtyChange > 0 ? '+' : ''}${qtyChange} units. New stock: ${newStock}`, 'success');
@@ -2984,139 +2014,39 @@
     // -------------------------
 
     function prepareSalesFiltersIfEmpty() {
-        if (window.LitePos && window.LitePos.sales && typeof window.LitePos.sales.prepareSalesFiltersIfEmpty === 'function') {
-            try { return window.LitePos.sales.prepareSalesFiltersIfEmpty(); } catch (e) { console.error(e); }
+        if (window.LitePos?.sales?.prepareSalesFiltersIfEmpty) {
+            return window.LitePos.sales.prepareSalesFiltersIfEmpty();
         }
-        const today = new Date();
-        if (!els['sales-filter-from'].value) {
-            const weekAgo = new Date(today.getTime() - 6 * 86400000);
-            els['sales-filter-from'].value = toDateInput(weekAgo);
-        }
-        if (!els['sales-filter-to'].value) {
-            els['sales-filter-to'].value = toDateInput(today);
-        }
-        populateSalespersonFilter();
+        console.error('prepareSalesFiltersIfEmpty: sales module not loaded');
     }
 
     function populateSalespersonFilter() {
-        if (window.LitePos && window.LitePos.sales && typeof window.LitePos.sales.populateSalespersonFilter === 'function') {
-            try { return window.LitePos.sales.populateSalespersonFilter(); } catch (e) { console.error(e); }
+        if (window.LitePos?.sales?.populateSalespersonFilter) {
+            return window.LitePos.sales.populateSalespersonFilter();
         }
-        const sel = els['sales-filter-user'];
-        if (!sel) return;
-        const prev = sel.value || 'all';
-        sel.innerHTML = '';
-        const optAll = document.createElement('option');
-        optAll.value = 'all';
-        optAll.textContent = 'All';
-        sel.appendChild(optAll);
-
-        db.users.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u.id;
-            opt.textContent = `${u.name} (${u.role === ROLE_SUPERADMIN ? 'Superadmin' : 'Sales'})`;
-            sel.appendChild(opt);
-        });
-        sel.value = prev;
+        console.error('populateSalespersonFilter: sales module not loaded');
     }
 
     function clearSalesFilters() {
-        if (window.LitePos && window.LitePos.sales && typeof window.LitePos.sales.clearSalesFilters === 'function') {
-            try { return window.LitePos.sales.clearSalesFilters(); } catch (e) { console.error(e); }
+        if (window.LitePos?.sales?.clearSalesFilters) {
+            return window.LitePos.sales.clearSalesFilters();
         }
-        els['sales-filter-from'].value = '';
-        els['sales-filter-to'].value = '';
-        els['sales-filter-status'].value = 'all';
-        els['sales-filter-user'].value = 'all';
-        els['sales-filter-query'].value = '';
-        renderSalesTable();
+        console.error('clearSalesFilters: sales module not loaded');
     }
 
     function renderSalesTable() {
-        if (window.LitePos && window.LitePos.sales && typeof window.LitePos.sales.renderSalesTable === 'function') {
-            try { return window.LitePos.sales.renderSalesTable(); } catch (e) { console.error(e); }
+        if (window.LitePos?.sales?.renderSalesTable) {
+            return window.LitePos.sales.renderSalesTable();
         }
-        const tbody = els['sales-table-body'];
-        tbody.innerHTML = '';
-
-        const from = els['sales-filter-from'].value;
-        const to = els['sales-filter-to'].value;
-        const status = els['sales-filter-status'].value;
-        const userId = els['sales-filter-user'].value;
-        const query = (els['sales-filter-query'].value || '').trim().toLowerCase();
-
-        db.sales
-            .slice()
-            .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-            .forEach(sale => {
-                if (from || to) {
-                    const d = new Date(sale.createdAt || sale.updatedAt || new Date());
-                    const dStr = toDateInput(d);
-                    if (from && dStr < from) return;
-                    if (to && dStr > to) return;
-                }
-
-                if (status !== 'all' && sale.status !== status) return;
-                if (userId && userId !== 'all' && sale.salespersonId !== userId) return;
-
-                if (query) {
-                    const customerName = sale.customer && sale.customer.name ? sale.customer.name : '';
-                    const phone = sale.customer && sale.customer.phone ? sale.customer.phone : '';
-                    const text = (sale.id + ' ' + customerName + ' ' + phone).toLowerCase();
-                    if (!text.includes(query)) return;
-                }
-
-                const tr = document.createElement('tr');
-
-                const tdDate = document.createElement('td');
-                const d = new Date(sale.createdAt || sale.updatedAt || new Date());
-                tdDate.textContent = `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-                tr.appendChild(tdDate);
-
-                const tdCustomer = document.createElement('td');
-                const customerName = sale.customer && sale.customer.name ? sale.customer.name : 'Walk-in';
-                tdCustomer.textContent = customerName;
-                tr.appendChild(tdCustomer);
-
-                const tdPhone = document.createElement('td');
-                tdPhone.textContent = sale.customer && sale.customer.phone ? sale.customer.phone : '—';
-                tr.appendChild(tdPhone);
-
-                const tdUser = document.createElement('td');
-                const user = db.users.find(u => u.id === sale.salespersonId);
-                tdUser.textContent = user ? user.name : '—';
-                tr.appendChild(tdUser);
-
-                const tdStatus = document.createElement('td');
-                tdStatus.textContent = sale.status;
-                tr.appendChild(tdStatus);
-
-                const itemsCount = sale.items.reduce((s, it) => s + it.qty, 0);
-                const tdItems = document.createElement('td');
-                tdItems.textContent = String(itemsCount);
-                tr.appendChild(tdItems);
-
-                const tdTotal = document.createElement('td');
-                tdTotal.textContent = formatMoney(sale.total || 0);
-                tr.appendChild(tdTotal);
-
-                const tdProfit = document.createElement('td');
-                tdProfit.textContent = formatMoney(computeProfitForSale(sale));
-                tr.appendChild(tdProfit);
-
-                tbody.appendChild(tr);
-            });
+        console.error('renderSalesTable: sales module not loaded');
     }
 
     function computeProfitForSale(sale) {
-        if (window.LitePos && window.LitePos.sales && typeof window.LitePos.sales.computeProfitForSale === 'function') {
-            try { return window.LitePos.sales.computeProfitForSale(sale); } catch (e) { console.error(e); }
+        if (window.LitePos?.sales?.computeProfitForSale) {
+            return window.LitePos.sales.computeProfitForSale(sale);
         }
-        let gross = 0;
-        sale.items.forEach(it => {
-            gross += (it.price - (it.buyPrice || 0)) * it.qty;
-        });
-        return gross - (sale.discount || 0);
+        console.error('computeProfitForSale: sales module not loaded');
+        return 0;
     }
 
     // -------------------------
@@ -3124,285 +2054,38 @@
     // -------------------------
 
     function refreshKpis() {
-        if (window.LitePos && window.LitePos.reports && typeof window.LitePos.reports.refreshKpis === 'function') {
-            try { return window.LitePos.reports.refreshKpis(); } catch (e) { console.error(e); }
+        if (window.LitePos?.reports?.refreshKpis) {
+            return window.LitePos.reports.refreshKpis();
         }
-        const closed = db.sales.filter(s => s.status === 'closed');
-        let totalValue = 0;
-        let totalProfit = 0;
-        closed.forEach(s => {
-            totalValue += s.total || 0;
-            totalProfit += computeProfitForSale(s);
-        });
-
-        els['kpi-total-sales'].textContent = formatMoney(totalValue);
-        els['kpi-total-sales-count'].textContent = `${closed.length} invoices`;
-        els['kpi-total-profit'].textContent = formatMoney(totalProfit);
-        els['kpi-profit-margin'].textContent = totalValue > 0
-            ? `${((totalProfit / totalValue) * 100).toFixed(1)}% margin`
-            : '—';
-
-        const todayStr = toDateInput(new Date());
-        let todayValue = 0;
-        let todayCount = 0;
-        closed.forEach(s => {
-            const dStr = toDateInput(new Date(s.createdAt || s.updatedAt || new Date()));
-            if (dStr === todayStr) {
-                todayValue += s.total || 0;
-                todayCount++;
-            }
-        });
-        els['kpi-today-sales'].textContent = formatMoney(todayValue);
-        els['kpi-today-sales-count'].textContent = `${todayCount} invoices`;
-
-        els['kpi-customers-count'].textContent = String(db.customers.length || 0);
-
-        const activeSaleId = currentSale && currentSale.id ? currentSale.id : null;
-        const openCount = db.sales.filter(s => s.status === 'open' && (!activeSaleId || s.id !== activeSaleId)).length;
-        els['kpi-open-sales'].textContent = String(openCount);
-
-        renderTodaySnapshot();
+        console.error('refreshKpis: reports module not loaded');
     }
 
     function renderTodaySnapshot() {
-        if (window.LitePos && window.LitePos.reports && typeof window.LitePos.reports.renderTodaySnapshot === 'function') {
-            try { return window.LitePos.reports.renderTodaySnapshot(); } catch (e) { console.error(e); }
+        if (window.LitePos?.reports?.renderTodaySnapshot) {
+            return window.LitePos.reports.renderTodaySnapshot();
         }
-        const closed = db.sales.filter(s => s.status === 'closed');
-        const todayStr = toDateInput(new Date());
-        let todayValue = 0;
-        let todayCount = 0;
-        let lastSale = null;
-        closed.forEach(s => {
-            const dStr = toDateInput(new Date(s.createdAt || s.updatedAt || new Date()));
-            if (dStr === todayStr) {
-                todayValue += s.total || 0;
-                todayCount++;
-                if (!lastSale || (s.createdAt || '').localeCompare(lastSale.createdAt || '') > 0) {
-                    lastSale = s;
-                }
-            }
-        });
-
-        els['today-summary-small'].textContent = todayCount
-            ? `${todayCount} sale(s) · ${formatMoney(todayValue)}`
-            : 'No sales yet today.';
-        els['today-salesperson-name'].textContent = currentUser ? currentUser.name : '—';
-        if (lastSale) {
-            els['today-last-sale'].textContent = `${lastSale.id} · ${formatMoney(lastSale.total || 0)}`;
-        } else {
-            els['today-last-sale'].textContent = '—';
-        }
+        console.error('renderTodaySnapshot: reports module not loaded');
     }
 
     function drawSalesChart() {
-        if (window.LitePos && window.LitePos.reports && typeof window.LitePos.reports.drawSalesChart === 'function') {
-            try { return window.LitePos.reports.drawSalesChart(); } catch (e) { console.error(e); }
+        if (window.LitePos?.reports?.drawSalesChart) {
+            return window.LitePos.reports.drawSalesChart();
         }
-        const canvas = els['salesChart'];
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-
-        const width = canvas.clientWidth || 400;
-        const height = 180;
-        canvas.width = width;
-        canvas.height = height;
-
-        ctx.clearRect(0, 0, width, height);
-
-        // Collect last 7 days totals
-        const days = [];
-        const today = new Date();
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date(today.getTime() - i * 86400000);
-            days.push(toDateInput(d));
-        }
-
-        const totals = days.map(dStr => {
-            return db.sales
-                .filter(s => s.status === 'closed')
-                .filter(s => toDateInput(new Date(s.createdAt || s.updatedAt || new Date())) === dStr)
-                .reduce((sum, s) => sum + (s.total || 0), 0);
-        });
-
-        const max = Math.max(...totals, 1);
-
-        const paddingLeft = 40;
-        const paddingRight = 10;
-        const paddingBottom = 20;
-        const paddingTop = 10;
-
-        const chartWidth = width - paddingLeft - paddingRight;
-        const chartHeight = height - paddingTop - paddingBottom;
-
-        ctx.font = '11px system-ui, sans-serif';
-        ctx.fillStyle = '#9ca3af';
-        ctx.strokeStyle = '#4b5563';
-
-        // Axes
-        ctx.beginPath();
-        ctx.moveTo(paddingLeft, paddingTop);
-        ctx.lineTo(paddingLeft, paddingTop + chartHeight);
-        ctx.lineTo(paddingLeft + chartWidth, paddingTop + chartHeight);
-        ctx.stroke();
-
-        const barWidth = chartWidth / (days.length * 1.4);
-        const gap = barWidth * 0.4;
-
-        totals.forEach((val, idx) => {
-            const x = paddingLeft + idx * (barWidth + gap) + gap;
-            const heightRatio = val / max;
-            const barHeight = chartHeight * heightRatio;
-            const y = paddingTop + chartHeight - barHeight;
-
-            // Bar
-            ctx.fillStyle = '#22c55e';
-            ctx.fillRect(x, y, barWidth, barHeight);
-
-            // Value label
-            ctx.fillStyle = '#e5e7eb';
-            ctx.textAlign = 'center';
-            ctx.fillText(
-                val > 0 ? shortMoney(val) : '',
-                x + barWidth / 2,
-                y - 4
-            );
-
-            // Day label
-            const label = days[idx].slice(5); // MM-DD
-            ctx.fillStyle = '#9ca3af';
-            ctx.textAlign = 'center';
-            ctx.fillText(label, x + barWidth / 2, paddingTop + chartHeight + 13);
-        });
+        console.error('drawSalesChart: reports module not loaded');
     }
 
     function exportCsvReport() {
-        if (window.LitePos && window.LitePos.reports && typeof window.LitePos.reports.exportCsvReport === 'function') {
-            try { return window.LitePos.reports.exportCsvReport(); } catch (e) { console.error(e); }
+        if (window.LitePos?.reports?.exportCsvReport) {
+            return window.LitePos.reports.exportCsvReport();
         }
-        const from = els['report-from'].value;
-        const to = els['report-to'].value;
-        const closed = db.sales.filter(s => s.status === 'closed');
-
-        const filtered = closed.filter(s => {
-            if (!from && !to) return true;
-            const dStr = toDateInput(new Date(s.createdAt || s.updatedAt || new Date()));
-            if (from && dStr < from) return false;
-            if (to && dStr > to) return false;
-            return true;
-        });
-
-        if (!filtered.length) {
-            return showToast('Export', 'No closed sales in selected period.', 'error');
-        }
-
-        const rows = [];
-        rows.push([
-            'Invoice',
-            'Date',
-            'Customer',
-            'Phone',
-            'Salesperson',
-            'Items',
-            'Total',
-            'Discount',
-            'Payment',
-            'Change',
-            'Profit'
-        ]);
-
-        filtered.forEach(s => {
-            const d = new Date(s.createdAt || s.updatedAt || new Date());
-            const customerName = s.customer && s.customer.name ? s.customer.name : 'Walk-in';
-            const phone = s.customer && s.customer.phone ? s.customer.phone : '';
-            const user = db.users.find(u => u.id === s.salespersonId);
-            const itemsCount = s.items.reduce((sum, it) => sum + it.qty, 0);
-            const profit = computeProfitForSale(s);
-
-            rows.push([
-                s.id,
-                d.toISOString(),
-                customerName,
-                phone,
-                user ? user.name : '',
-                String(itemsCount),
-                s.total || 0,
-                s.discount || 0,
-                s.payment || 0,
-                s.change || 0,
-                profit
-            ]);
-        });
-
-        const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const todayStr = toDateInput(new Date()).replace(/-/g, '');
-        a.download = `litepos-report-${todayStr}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-
-        showToast('Export', 'CSV report downloaded.', 'success');
+        console.error('exportCsvReport: reports module not loaded');
     }
 
     function printReport() {
-        if (window.LitePos && window.LitePos.reports && typeof window.LitePos.reports.printReport === 'function') {
-            try { return window.LitePos.reports.printReport(); } catch (e) { console.error(e); }
+        if (window.LitePos?.reports?.printReport) {
+            return window.LitePos.reports.printReport();
         }
-        const from = els['report-from'].value;
-        const to = els['report-to'].value;
-        const closed = db.sales.filter(s => s.status === 'closed');
-
-        const filtered = closed.filter(s => {
-            if (!from && !to) return true;
-            const dStr = toDateInput(new Date(s.createdAt || s.updatedAt || new Date()));
-            if (from && dStr < from) return false;
-            if (to && dStr > to) return false;
-            return true;
-        });
-
-        const tbody = els['report-print-body'];
-        tbody.innerHTML = '';
-
-        // Aggregate per day
-        const byDay = {};
-        filtered.forEach(s => {
-            const dStr = toDateInput(new Date(s.createdAt || s.updatedAt || new Date()));
-            if (!byDay[dStr]) {
-                byDay[dStr] = { invoices: 0, total: 0, profit: 0 };
-            }
-            byDay[dStr].invoices++;
-            byDay[dStr].total += s.total || 0;
-            byDay[dStr].profit += computeProfitForSale(s);
-        });
-
-        Object.keys(byDay).sort().forEach(day => {
-            const row = byDay[day];
-            const tr = document.createElement('tr');
-            const tdDate = document.createElement('td');
-            tdDate.textContent = day;
-            const tdInv = document.createElement('td');
-            tdInv.textContent = String(row.invoices);
-            const tdTotal = document.createElement('td');
-            tdTotal.textContent = formatMoney(row.total);
-            const tdProfit = document.createElement('td');
-            tdProfit.textContent = formatMoney(row.profit);
-            tr.appendChild(tdDate);
-            tr.appendChild(tdInv);
-            tr.appendChild(tdTotal);
-            tr.appendChild(tdProfit);
-            tbody.appendChild(tr);
-        });
-
-        els['report-print-period'].textContent = `Period: ${from || '—'} to ${to || '—'}`;
-
-        document.body.classList.add('print-report');
-        window.print();
-        setTimeout(() => {
-            document.body.classList.remove('print-report');
-        }, 500);
+        console.error('printReport: reports module not loaded');
     }
 
     // -------------------------
@@ -3410,24 +2093,45 @@
     // -------------------------
 
     function loadShopForm() {
-        if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.loadShopForm === 'function') {
-            try { return window.LitePos.admin.loadShopForm(); } catch (e) { console.error(e); }
+        if (window.LitePos?.admin?.loadShopForm) {
+            return window.LitePos.admin.loadShopForm();
         }
-        els['shop-name'].value = db.shop.name || '';
-        els['shop-address'].value = db.shop.address || '';
-        els['shop-phone'].value = db.shop.phone || '';
+        console.error('loadShopForm: admin module not loaded');
     }
 
     function saveShopSettingsFromForm() {
-        if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.saveShopSettingsFromForm === 'function') {
-            try { return window.LitePos.admin.saveShopSettingsFromForm(); } catch (e) { console.error(e); }
+        if (window.LitePos?.admin?.saveShopSettingsFromForm) {
+            return window.LitePos.admin.saveShopSettingsFromForm();
         }
-        db.shop.name = els['shop-name'].value.trim() || 'Shop';
-        db.shop.address = els['shop-address'].value.trim();
-        db.shop.phone = els['shop-phone'].value.trim();
-        saveDb();
-        loadShopIntoHeader();
-        showToast('Settings saved', 'Shop settings updated.', 'success');
+        console.error('saveShopSettingsFromForm: admin module not loaded');
+    }
+
+    function handleLogoUpload(ev) {
+        if (window.LitePos?.admin?.handleLogoUpload) {
+            return window.LitePos.admin.handleLogoUpload(ev);
+        }
+        console.error('handleLogoUpload: admin module not loaded');
+    }
+
+    function removeLogo() {
+        if (window.LitePos?.admin?.removeLogo) {
+            return window.LitePos.admin.removeLogo();
+        }
+        console.error('removeLogo: admin module not loaded');
+    }
+
+    function loadGlobalSettings() {
+        if (window.LitePos?.admin?.loadGlobalSettings) {
+            return window.LitePos.admin.loadGlobalSettings();
+        }
+        console.error('loadGlobalSettings: admin module not loaded');
+    }
+
+    function saveGlobalSettings() {
+        if (window.LitePos?.admin?.saveGlobalSettings) {
+            return window.LitePos.admin.saveGlobalSettings();
+        }
+        console.error('saveGlobalSettings: admin module not loaded');
     }
 
     // -------------------------
@@ -3435,117 +2139,31 @@
     // -------------------------
 
     function renderUsersTable() {
-        if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.renderUsersTable === 'function') {
-            try { return window.LitePos.admin.renderUsersTable(); } catch (e) { console.error(e); }
+        if (window.LitePos?.admin?.renderUsersTable) {
+            return window.LitePos.admin.renderUsersTable();
         }
-        const tbody = els['users-table-body'];
-        tbody.innerHTML = '';
-
-        db.users.forEach(u => {
-            const tr = document.createElement('tr');
-            tr.addEventListener('click', () => loadUserToForm(u.id));
-
-            const tdName = document.createElement('td');
-            tdName.textContent = u.name;
-            tr.appendChild(tdName);
-
-            const tdUsername = document.createElement('td');
-            tdUsername.textContent = u.username;
-            tr.appendChild(tdUsername);
-
-            const tdRole = document.createElement('td');
-            tdRole.textContent = u.role === ROLE_SUPERADMIN ? 'Superadmin' : 'Sales';
-            tr.appendChild(tdRole);
-
-            tbody.appendChild(tr);
-        });
+        console.error('renderUsersTable: admin module not loaded');
     }
 
     function loadUserToForm(id) {
-        if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.loadUserToForm === 'function') {
-            try { return window.LitePos.admin.loadUserToForm(id); } catch (e) { console.error(e); }
+        if (window.LitePos?.admin?.loadUserToForm) {
+            return window.LitePos.admin.loadUserToForm(id);
         }
-        const u = db.users.find(u => u.id === id);
-        if (!u) return;
-        els['user-edit-name'].value = u.name;
-        els['user-edit-username'].value = u.username;
-        els['user-edit-pin'].value = '';
-        els['user-edit-role'].value = u.role;
-        els['user-edit-name'].dataset.userId = u.id;
+        console.error('loadUserToForm: admin module not loaded');
     }
 
     function clearUserForm() {
-        if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.clearUserForm === 'function') {
-            try { return window.LitePos.admin.clearUserForm(); } catch (e) { console.error(e); }
+        if (window.LitePos?.admin?.clearUserForm) {
+            return window.LitePos.admin.clearUserForm();
         }
-        els['user-edit-name'].value = '';
-        els['user-edit-username'].value = '';
-        els['user-edit-pin'].value = '';
-        els['user-edit-role'].value = ROLE_SALES;
-        delete els['user-edit-name'].dataset.userId;
+        console.error('clearUserForm: admin module not loaded');
     }
 
     function saveUserFromForm() {
-        if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.saveUserFromForm === 'function') {
-            try { return window.LitePos.admin.saveUserFromForm(); } catch (e) { console.error(e); }
+        if (window.LitePos?.admin?.saveUserFromForm) {
+            return window.LitePos.admin.saveUserFromForm();
         }
-        const name = els['user-edit-name'].value.trim();
-        const username = els['user-edit-username'].value.trim();
-        const pin = els['user-edit-pin'].value.trim();
-        const role = els['user-edit-role'].value;
-        if (!name || !username) {
-            return showToast('User', 'Name & username are required.', 'error');
-        }
-        const existingId = els['user-edit-name'].dataset.userId;
-        let user;
-        if (existingId) {
-            user = db.users.find(u => u.id === existingId);
-        }
-
-        // Username unique
-        const dup = db.users.find(u => u.username === username && u.id !== existingId);
-        if (dup) {
-            return showToast('User', 'Another user already uses this username.', 'error');
-        }
-
-        if (user) {
-            const wasSuper = user.role === ROLE_SUPERADMIN;
-            user.name = name;
-            user.username = username;
-            if (pin) {
-                if (!/^\d{4,6}$/.test(pin)) {
-                    return showToast('User', 'PIN must be 4–6 digits if provided.', 'error');
-                }
-                user.pin = pin;
-            }
-            user.role = role;
-
-            if (wasSuper && role !== ROLE_SUPERADMIN) {
-                const remainingSuper = db.users.filter(u => u.role === ROLE_SUPERADMIN).length;
-                if (remainingSuper === 0) {
-                    user.role = ROLE_SUPERADMIN; // revert
-                    return showToast('User', 'At least one Superadmin is required.', 'error');
-                }
-            }
-        } else {
-            if (!/^\d{4,6}$/.test(pin || '')) {
-                return showToast('User', 'PIN must be 4–6 digits.', 'error');
-            }
-            user = {
-                id: 'u' + (db.users.length + 1),
-                name,
-                username,
-                pin,
-                role,
-                createdAt: new Date().toISOString()
-            };
-            db.users.push(user);
-        }
-
-        saveDb();
-        renderUsersTable();
-        populateSalespersonFilter();
-        showToast('User saved', `${user.name}`, 'success');
+        console.error('saveUserFromForm: admin module not loaded');
     }
 
     // -------------------------
@@ -3553,53 +2171,17 @@
     // -------------------------
 
     function downloadBackup() {
-        if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.downloadBackup === 'function') {
-            try { return window.LitePos.admin.downloadBackup(); } catch (e) { console.error(e); }
+        if (window.LitePos?.admin?.downloadBackup) {
+            return window.LitePos.admin.downloadBackup();
         }
-        const backup = {
-            exportedAt: new Date().toISOString(),
-            db
-        };
-        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const todayStr = toDateInput(new Date()).replace(/-/g, '');
-        a.href = url;
-        a.download = `litepos-backup-${todayStr}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast('Backup', 'Backup JSON downloaded.', 'success');
+        console.error('downloadBackup: admin module not loaded');
     }
 
     function handleRestoreFile(ev) {
-        if (window.LitePos && window.LitePos.admin && typeof window.LitePos.admin.handleRestoreFile === 'function') {
-            try { return window.LitePos.admin.handleRestoreFile(ev); } catch (e) { console.error(e); }
+        if (window.LitePos?.admin?.handleRestoreFile) {
+            return window.LitePos.admin.handleRestoreFile(ev);
         }
-        const file = ev.target.files[0];
-        if (!file) return;
-        if (!confirm('Restoring backup will replace all local data. Continue?')) {
-            ev.target.value = '';
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-            try {
-                const parsed = JSON.parse(reader.result);
-                const nextDb = parsed.db || parsed;
-                if (!nextDb || !nextDb.shop || !nextDb.users) {
-                    throw new Error('Invalid backup structure.');
-                }
-                localStorage.setItem(DB_KEY, JSON.stringify(nextDb));
-                saveSession(null);
-                showToast('Restore', 'Backup restored. Reloading...', 'success');
-                setTimeout(() => location.reload(), 700);
-            } catch (e) {
-                console.error(e);
-                showToast('Restore failed', 'Invalid backup file.', 'error');
-            }
-        };
-        reader.readAsText(file);
-        ev.target.value = '';
+        console.error('handleRestoreFile: admin module not loaded');
     }
 
     // -------------------------
@@ -3620,7 +2202,7 @@
     }
 
     function showToast(title, message, type) {
-        const container = els['toast-container'];
+        const container = getElement('toast-container');
         if (!container) return;
 
         const toast = document.createElement('div');
@@ -3708,5 +2290,6 @@
     window.setCurrentCustomer = setCurrentCustomer;
     window.findCustomerFromInput = findCustomerFromInput;
     window.createEmptySale = createEmptySale;
+    window.renderStockUpdatesTable = renderStockUpdatesTable;
 
 })();

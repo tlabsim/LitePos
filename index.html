@@ -12,8 +12,9 @@
     <!-- APP HEADER -->
     <header class="app-header">
         <div class="logo-block">
-            <div class="logo-mark">
-                <span>৳</span>
+            <div id="header-logo-container" class="logo-mark">
+                <img id="header-logo-img" class="header-logo-img" style="display: none;">
+                <span id="header-logo-text">৳</span>
             </div>
             <div class="logo-text">
                 <div class="logo-title" id="header-shop-name">
@@ -34,7 +35,10 @@
                 <span class="pill-role" id="header-user-role"></span>
             </div>
             <button id="btn-logout" class="btn btn-ghost btn-lg" type="button">
-                ⎋ Logout
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" />
+                </svg>
+                Logout
             </button>
         </div>
     </header>
@@ -152,7 +156,7 @@
                         <h2 class="card-title">
                             New Sale
                             <span class="subheader-bn">· নতুন বিক্রয়</span>
-                            <span id="summary-sale-id-display" class="badge sale-id-display">Sale ID: <span id="summary-sale-id-value">New</span></span>
+                            <span id="summary-sale-id-display" class="badge sale-id-display" style="margin-left: 12px">Sale ID: <span id="summary-sale-id-value">New</span></span>
                         </h2>
                         <div class="sale-header-right">
                             <div id="sale-header-total" class="sale-header-total">৳ 0.00</div>
@@ -182,17 +186,17 @@
                         <!-- Cart (products list removed; overlay used instead) -->
                         <div>
                             <div class="section-header">
-                                <span class="section-title">
+                                <span class="section-title-large">
                                     Cart · কার্ট
                                 </span>
                                 <div class="section-sub-group">
                                     <span id="cart-count-chip" class="cart-count-chip hidden">0 items</span>
-                                    <span class="section-sub">
+                                    <!-- <span class="section-sub">
                                         Current sale
-                                    </span>
+                                    </span> -->
                                 </div>
                             </div>
-                            <div id="cart-table-wrapper" class="table-wrapper table-large">
+                            <div id="cart-table-wrapper" class="table-wrapper table-large" style="min-height: 280px;">
                                 <table>
                                     <thead>
                                     <tr>
@@ -219,19 +223,23 @@
 
                         <!-- Sale actions -->
                         <div id="sale-actions-row" class="sale-control-row">
-
-                            <div class="sale-buttons">
+                            <div class="sale-buttons-left">
                                 <button id="btn-new-sale" class="btn btn-ghost btn-xl" type="button">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
                                       <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                                     </svg>
                                     New sale (Alt+N)
                                 </button>
-                                <button id="btn-hold-sale" class="btn btn-accent btn-xl" type="button">
-                                    ⏸ Hold / Save Open (Alt+H)
-                                </button>
                                 <button id="btn-cancel-sale" class="btn btn-ghost btn-xl" type="button">
-                                    ✕ Cancel Open
+                                    ✕ Cancel Sale
+                                </button>
+                            </div>
+                            <div class="sale-buttons-right">
+                                <button id="btn-hold-sale" class="btn btn-accent btn-xl" type="button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                                    </svg>
+                                    Hold / Save (Alt+H)
                                 </button>
                             </div>
                         </div>
@@ -254,9 +262,9 @@
                                     <tr>
                                         <th>Sale ID</th>
                                         <th>Customer</th>
-                                        <th>Items</th>
-                                        <th>Total</th>
-                                        <th>Time</th>
+                                        <th style="text-align: center;">Items</th>
+                                        <th style="text-align: right;">Total</th>
+                                        <th style="text-align: center;">Time</th>
                                         <th style="width: 80px;">Actions</th>
                                     </tr>
                                 </thead>
@@ -300,27 +308,31 @@
                                     <div class="product-overlay-inner">
                                         <table>
                                             <thead>
-                                                <tr><th>Name</th><th>Phone</th><th></th></tr>
+                                                <tr><th>Name</th><th>Phone</th><th>Address</th><th></th></tr>
                                             </thead>
                                             <tbody id="customer-overlay-body"></tbody>
                                         </table>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="field">
-                                <label class="field-label">Customer Name · গ্রাহকের নাম</label>
-                                <input id="sale-customer-name" type="text" class="field-input" placeholder="Name" autocomplete="off">
-                            </div>
-                            <div class="quick-add-small">
-                                <input id="quick-customer-name" type="text" class="field-input field-input-sm" placeholder="Quick name">
-                                <input id="quick-customer-notes" type="text" class="field-input field-input-sm" placeholder="Notes">
-                                <button id="btn-save-quick-customer" class="btn btn-accent btn-md" type="button">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;">
-                                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                    </svg>
-                                    Save
-                                </button>
-                                <button id="btn-clear-customer" class="btn btn-ghost btn-md" type="button">✕ Clear</button>
+                            </div>                            
+                            <div class="stack-gap-sm ">
+                                <div class="field">
+                                    <label class="field-label">Customer Name · গ্রাহকের নাম</label>
+                                    <input id="sale-customer-name" type="text" class="field-input" placeholder="Name" autocomplete="off">
+                                </div>
+                                <input id="quick-customer-address" type="text" class="field-input field-input-sm grow" placeholder="Address">
+                                <div class="row-between">
+                                    <input id="quick-customer-notes" type="text" class="field-input field-input-sm grow" placeholder="Notes">
+                                    <div class="row-gap">
+                                        <button id="btn-save-quick-customer" class="btn btn-accent btn-md" type="button">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                            </svg>
+                                            Save
+                                        </button>
+                                        <button id="btn-clear-customer" class="btn btn-ghost btn-md" type="button">✕ Clear</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -459,39 +471,75 @@
                 </div>
             </div>
             </div>
+        </div>
+        <!-- END TAB: POS SALE -->
 
-            <!-- HIDDEN RECEIPT (for printing) -->
-            <div id="receipt-print" class="receipt-print">
-                <div class="receipt-inner">
+        <!-- HIDDEN RECEIPT (for printing) -->
+        <div id="receipt-print" class="receipt-print">
+            <!-- Standard Template -->
+            <div id="receipt-standard" class="receipt-inner receipt-template">
+                <div class="receipt-header">
+                    <img id="receipt-logo-standard" class="receipt-logo" style="display: none; max-width: 120px; max-height: 80px; margin: 0 auto 10px;">
                     <h2 id="receipt-shop-name">Shop Name</h2>
                     <div id="receipt-shop-address">Address</div>
                     <div id="receipt-shop-phone">Phone</div>
-                    <hr>
-                    <div id="receipt-sale-meta"></div>
-                    <table class="receipt-table">
-                        <thead>
-                        <tr>
-                            <th>Item</th>
-                            <th>Qty</th>
-                            <th>Price</th>
-                            <th>Total</th>
-                        </tr>
-                        </thead>
-                        <tbody id="receipt-items-body"></tbody>
-                    </table>
-                    <hr>
-                    <div class="receipt-totals">
-                        <div><span>Subtotal</span><span id="receipt-subtotal"></span></div>
-                        <div><span>Discount</span><span id="receipt-discount"></span></div>
-                        <div><span>Total</span><span id="receipt-total"></span></div>
-                        <div><span>Payment</span><span id="receipt-payment"></span></div>
-                        <div><span>Change</span><span id="receipt-change"></span></div>
-                    </div>
-                    <p class="receipt-note">ধন্যবাদ! আবার আসবেন।</p>
                 </div>
+                <hr>
+                <div id="receipt-sale-meta"></div>
+                <table class="receipt-table">
+                    <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                        <th>Total</th>
+                    </tr>
+                    </thead>
+                    <tbody id="receipt-items-body"></tbody>
+                </table>
+                <hr>
+                <div class="receipt-totals">
+                    <div><span>Subtotal</span><span id="receipt-subtotal"></span></div>
+                    <div><span>Discount</span><span id="receipt-discount"></span></div>
+                    <div><span>Total</span><span id="receipt-total"></span></div>
+                    <div><span>Payment</span><span id="receipt-payment"></span></div>
+                    <div><span>Change</span><span id="receipt-change"></span></div>
+                </div>
+                <p class="receipt-note">ধন্যবাদ! আবার আসবেন।</p>
+            </div>
+            
+            <!-- Compact Template -->
+            <div id="receipt-compact" class="receipt-inner receipt-template" style="display: none;">
+                <div class="receipt-header-compact">
+                    <img id="receipt-logo-compact" class="receipt-logo-compact" style="display: none; max-width: 80px; max-height: 50px; margin: 0 auto 5px;">
+                    <h3 id="receipt-shop-name-compact" style="margin: 0; font-size: 16px;">Shop Name</h3>
+                    <div id="receipt-shop-address-compact" style="font-size: 10px;">Address</div>
+                    <div id="receipt-shop-phone-compact" style="font-size: 10px;">Phone</div>
+                </div>
+                <hr style="margin: 8px 0;">
+                <div id="receipt-sale-meta-compact" style="font-size: 10px; margin-bottom: 8px;"></div>
+                <table class="receipt-table-compact" style="font-size: 10px;">
+                    <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Q</th>
+                        <th>Price</th>
+                        <th>Tot</th>
+                    </tr>
+                    </thead>
+                    <tbody id="receipt-items-body-compact"></tbody>
+                </table>
+                <hr style="margin: 8px 0;">
+                <div class="receipt-totals-compact" style="font-size: 11px;">
+                    <div><span>Subtotal</span><span id="receipt-subtotal-compact"></span></div>
+                    <div><span>Discount</span><span id="receipt-discount-compact"></span></div>
+                    <div style="font-weight: bold; font-size: 12px;"><span>Total</span><span id="receipt-total-compact"></span></div>
+                    <div><span>Payment</span><span id="receipt-payment-compact"></span></div>
+                    <div><span>Change</span><span id="receipt-change-compact"></span></div>
+                </div>
+                <p class="receipt-note" style="font-size: 10px; margin-top: 8px;">ধন্যবাদ! আবার আসবেন।</p>
             </div>
         </div>
-        <!-- END TAB: POS SALE -->
 
         <!-- TAB: CUSTOMERS -->
         <div id="tab-customers" class="tab-content hidden">
@@ -589,15 +637,14 @@
                         <div class="card-header">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                                 <div style="flex: 1;">
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <h2 class="card-title" style="margin: 0;">Products</h2>
+                                    <h2 class="card-title">Products
                                         <span class="subheader-bn">· পণ্যসমূহ</span>
-                                    </div>
+                                    </h2>
                                     <p class="card-sub" style="margin-top: 4px;">
                                         Buying price, selling price, stock &amp; low-stock warnings.
                                     </p>
                                 </div>
-                                <span class="badge" id="product-count-badge" style="background: var(--primary); color: white; padding: 4px 12px; border-radius: 12px; font-size: 13px; white-space: nowrap;">0 products</span>
+                                <span class="badge" id="product-count-badge" style="background: var(--primary); color: white; padding: 4px 12px; margin-top: 16px; border-radius: 12px; font-size: 13px; white-space: nowrap;">0 products</span>
                             </div>
                         </div>
                         <div class="card-body stack-gap">
@@ -666,175 +713,177 @@
 
                 <!-- RIGHT COLUMN: Forms -->
                 <div class="stack-gap">
-                    <div class="card">
+                    <div class="stack-gap">
+                        <div class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h2 class="card-title">
+                                        Add / Edit Product
+                                        <span class="subheader-bn">· পণ্য যোগ/সম্পাদনা</span>
+                                    </h2>
+                                    <p class="card-sub">
+                                        Tap a product row to load. Use SKU as unique identifier.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="card-body stack-gap">
+                                <div class="two-col">
+                                    <div class="field">
+                                        <label class="field-label">Name</label>
+                                        <input id="product-edit-name" type="text" class="field-input" autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label">SKU</label>
+                                        <input id="product-edit-sku" type="text" class="field-input" autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label">Barcode (optional)</label>
+                                        <input id="product-edit-barcode" type="text" class="field-input" autocomplete="off" placeholder="Scan or enter barcode">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label">Category (optional)</label>
+                                        <input id="product-edit-category" type="text" class="field-input" autocomplete="off" placeholder="e.g., Electronics, Food, etc." list="category-suggestions">
+                                        <datalist id="category-suggestions">
+                                            <!-- Filled by JS -->
+                                        </datalist>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label">Brand (optional)</label>
+                                        <input id="product-edit-brand" type="text" class="field-input" autocomplete="off" placeholder="e.g., Samsung, Nike" list="brand-suggestions">
+                                        <datalist id="brand-suggestions">
+                                            <!-- Filled by JS -->
+                                        </datalist>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label">Supplier (optional)</label>
+                                        <input id="product-edit-supplier" type="text" class="field-input" autocomplete="off" placeholder="e.g., ABC Traders" list="supplier-suggestions">
+                                        <datalist id="supplier-suggestions">
+                                            <!-- Filled by JS -->
+                                        </datalist>
+                                    </div>
+                                </div>
+                            </div>  
+                            <div class="two-col">
+                                <div class="field">
+                                    <label class="field-label">Buying Price (৳)</label>
+                                    <input id="product-edit-buy" type="number" class="field-input" min="0" step="1">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Selling Price (৳)</label>
+                                    <input id="product-edit-sell" type="number" class="field-input" min="0" step="1">
+                                </div>
+                            </div>
+                            <div class="two-col">
+                                <div class="field">
+                                    <label class="field-label">Stock</label>
+                                    <input id="product-edit-stock" type="number" class="field-input" min="0" step="1">
+                                    <p class="hint-text" style="margin-top: 4px; font-size: 12px;">Stock can only be set for new products. For existing products, use stock adjustment below.</p>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Low stock alert at</label>
+                                    <input id="product-edit-low" type="number" class="field-input" min="0" step="1">
+                                </div>
+                            </div>
+                            <div class="input-row">
+                                <button id="btn-save-product" class="btn btn-primary btn-xl" type="button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-12L10.125 2.25z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 17.25h-9m9-4.5h-9m5.25-9v6.75h-6.75" />
+                                    </svg>
+                                    Save product
+                                </button>
+                                <button id="btn-new-product" class="btn btn-ghost btn-xl" type="button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                    </svg>
+                                    New
+                                </button>
+                                <button id="btn-delete-product" class="btn btn-ghost btn-xl" type="button" style="display: none; color: var(--danger); margin-left: auto;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                    </svg>
+                                    Delete
+                                </button>
+                            </div>
+                            <p class="hint-text">
+                                Low stock products will be highlighted with warning badge.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Stock Adjustment Card (only visible for existing products) -->
+                    <div id="stock-adjustment-card" class="card" style="display: none;">
                         <div class="card-header">
                             <div>
-                                <h2 class="card-title">
-                                    Add / Edit Product
-                                    <span class="subheader-bn">· পণ্য যোগ/সম্পাদনা</span>
-                                </h2>
+                                <span class="card-title">Stock Adjustment</span>
                                 <p class="card-sub">
-                                    Tap a product row to load. Use SKU as unique identifier.
+                                    Update inventory for selected product. Current stock: <strong id="stock-current-value">0</strong>
                                 </p>
                             </div>
                         </div>
                         <div class="card-body stack-gap">
                             <div class="two-col">
                                 <div class="field">
-                                    <label class="field-label">Name</label>
-                                    <input id="product-edit-name" type="text" class="field-input" autocomplete="off">
+                                    <label class="field-label">Adjustment Quantity</label>
+                                    <input id="stock-adjustment-qty" type="number" class="field-input" step="1" placeholder="e.g., 10 or -5">
+                                    <p class="hint-text" style="margin-top: 4px; font-size: 12px;">Positive = add stock, Negative = reduce stock</p>
                                 </div>
                                 <div class="field">
-                                    <label class="field-label">SKU</label>
-                                    <input id="product-edit-sku" type="text" class="field-input" autocomplete="off">
-                                </div>
-                                <div class="field">
-                                    <label class="field-label">Barcode (optional)</label>
-                                    <input id="product-edit-barcode" type="text" class="field-input" autocomplete="off" placeholder="Scan or enter barcode">
-                                </div>
-                                <div class="field">
-                                    <label class="field-label">Category (optional)</label>
-                                    <input id="product-edit-category" type="text" class="field-input" autocomplete="off" placeholder="e.g., Electronics, Food, etc." list="category-suggestions">
-                                    <datalist id="category-suggestions">
-                                        <!-- Filled by JS -->
-                                    </datalist>
-                                </div>
-                                <div class="field">
-                                    <label class="field-label">Brand (optional)</label>
-                                    <input id="product-edit-brand" type="text" class="field-input" autocomplete="off" placeholder="e.g., Samsung, Nike" list="brand-suggestions">
-                                    <datalist id="brand-suggestions">
-                                        <!-- Filled by JS -->
-                                    </datalist>
-                                </div>
-                                <div class="field">
-                                    <label class="field-label">Supplier (optional)</label>
-                                    <input id="product-edit-supplier" type="text" class="field-input" autocomplete="off" placeholder="e.g., ABC Traders" list="supplier-suggestions">
-                                    <datalist id="supplier-suggestions">
-                                        <!-- Filled by JS -->
-                                    </datalist>
+                                    <label class="field-label">Date</label>
+                                    <input id="stock-adjustment-date" type="date" class="field-input">
                                 </div>
                             </div>
-                        </div>  
-                        <div class="two-col">
                             <div class="field">
-                                <label class="field-label">Buying Price (৳)</label>
-                                <input id="product-edit-buy" type="number" class="field-input" min="0" step="1">
+                                <label class="field-label">Note (optional)</label>
+                                <input id="stock-adjustment-note" type="text" class="field-input" placeholder="e.g., New shipment, Damaged items, etc.">
                             </div>
-                            <div class="field">
-                                <label class="field-label">Selling Price (৳)</label>
-                                <input id="product-edit-sell" type="number" class="field-input" min="0" step="1">
+                            <div class="input-row">
+                                <button id="btn-save-stock-adjustment" class="btn btn-primary btn-xl" type="button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                    </svg>
+                                    Apply Adjustment
+                                </button>
                             </div>
                         </div>
-                        <div class="two-col">
-                            <div class="field">
-                                <label class="field-label">Stock</label>
-                                <input id="product-edit-stock" type="number" class="field-input" min="0" step="1">
-                                <p class="hint-text" style="margin-top: 4px; font-size: 12px;">Stock can only be set for new products. For existing products, use stock adjustment below.</p>
-                            </div>
-                            <div class="field">
-                                <label class="field-label">Low stock alert at</label>
-                                <input id="product-edit-low" type="number" class="field-input" min="0" step="1">
-                            </div>
-                        </div>
-                        <div class="input-row">
-                            <button id="btn-save-product" class="btn btn-primary btn-xl" type="button">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-12L10.125 2.25z" />
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 17.25h-9m9-4.5h-9m5.25-9v6.75h-6.75" />
-                                </svg>
-                                Save product
-                            </button>
-                            <button id="btn-new-product" class="btn btn-ghost btn-xl" type="button">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                </svg>
-                                New
-                            </button>
-                            <button id="btn-delete-product" class="btn btn-ghost btn-xl" type="button" style="display: none; color: var(--danger); margin-left: auto;">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                </svg>
-                                Delete
-                            </button>
-                        </div>
-                        <p class="hint-text">
-                            Low stock products will be highlighted with warning badge.
-                        </p>
                     </div>
-                </div>
 
-                <!-- Stock Adjustment Card (only visible for existing products) -->
-                <div id="stock-adjustment-card" class="card" style="display: none;">
-                    <div class="card-header">
-                        <div>
-                            <span class="card-title">Stock Adjustment</span>
-                            <p class="card-sub">
-                                Update inventory for selected product. Current stock: <strong id="stock-current-value">0</strong>
-                            </p>
-                        </div>
-                    </div>
-                    <div class="card-body stack-gap">
-                        <div class="two-col">
-                            <div class="field">
-                                <label class="field-label">Adjustment Quantity</label>
-                                <input id="stock-adjustment-qty" type="number" class="field-input" step="1" placeholder="e.g., 10 or -5">
-                                <p class="hint-text" style="margin-top: 4px; font-size: 12px;">Positive = add stock, Negative = reduce stock</p>
+                    <!-- Stock Updates Log Card (collapsible) -->
+                    <div id="stock-updates-card" class="card" style="display: none;">
+                        <div class="card-header" style="cursor: pointer;" id="stock-updates-header">
+                            <div>
+                                <span class="card-title">Stock Update History</span>
+                                <p class="card-sub">
+                                    View all stock adjustments for this product
+                                </p>
                             </div>
-                            <div class="field">
-                                <label class="field-label">Date</label>
-                                <input id="stock-adjustment-date" type="date" class="field-input">
-                            </div>
-                        </div>
-                        <div class="field">
-                            <label class="field-label">Note (optional)</label>
-                            <input id="stock-adjustment-note" type="text" class="field-input" placeholder="e.g., New shipment, Damaged items, etc.">
-                        </div>
-                        <div class="input-row">
-                            <button id="btn-save-stock-adjustment" class="btn btn-primary btn-xl" type="button">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            <button type="button" class="btn btn-ghost" id="btn-toggle-stock-updates" style="margin-left: auto;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                                 </svg>
-                                Apply Adjustment
+                                Expand
                             </button>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Stock Updates Log Card (collapsible) -->
-                <div id="stock-updates-card" class="card" style="display: none;">
-                    <div class="card-header" style="cursor: pointer;" id="stock-updates-header">
-                        <div>
-                            <span class="card-title">Stock Update History</span>
-                            <p class="card-sub">
-                                View all stock adjustments for this product
-                            </p>
+                        <div class="card-body stack-gap" id="stock-updates-body" style="display: none; margin-top: 12px;">
+                            <div class="table-wrapper">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Change</th>
+                                            <th>Before</th>
+                                            <th>After</th>
+                                            <th>Note</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="stock-updates-table-body">
+                                        <!-- Filled by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <button type="button" class="btn btn-ghost" id="btn-toggle-stock-updates" style="margin-left: auto;">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;">
-                              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                            </svg>
-                            Expand
-                        </button>
-                    </div>
-                    <div class="card-body stack-gap" id="stock-updates-body" style="display: none;">
-                        <div class="table-wrapper">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Change</th>
-                                        <th>Before</th>
-                                        <th>After</th>
-                                        <th>Note</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="stock-updates-table-body">
-                                    <!-- Filled by JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>                    
+                    </div>   
+                </div>                   
             </div>
         </div>
 
@@ -878,23 +927,25 @@
                             <label class="field-label">Search (customer, phone, sale ID)</label>
                             <input id="sales-filter-query" type="text" class="field-input field-input-sm" autocomplete="off">
                         </div>
-                        <button id="btn-sales-clear-filters" class="btn btn-ghost btn-xl" type="button">
+                        <button id="btn-sales-clear-filters" class="btn btn-ghost btn-sm" type="button">
                             ⟳ Clear filters
                         </button>
                     </div>
-                    <div class="table-wrapper table-tall">
+                    <div id="sales-global-summary-container"></div>
+                    <div class="table-wrapper">
                         <table>
                             <thead>
                             <tr>
-                                <th style="width: 16%;">Date / Time</th>
-                                <th style="width: 18%;">Customer</th>
-                                <th>Phone</th>
-                                <th>Salesperson</th>
-                                <th>Status</th>
-                                <th>Items</th>
-                                <th>Total (৳)</th>
-                                <th>Profit (৳)</th>
-                                <th style="width: 80px;">Actions</th>
+                                <th style="width: 80px;">Sale ID</th>
+                                <th style="width: 8%;">Time</th>
+                                <th style="width: 12%;">Customer</th>
+                                <th style="width: 8%;">Phone</th>
+                                <th style="width: 8%;">Salesperson</th>
+                                <th style="width: 8%;">Status</th>
+                                <th style="width: 8%;">Items</th>
+                                <th style="width: 8%;">Total (৳)</th>
+                                <th style="width: 8%;">Profit (৳)</th>
+                                <th style="width: 150px;">Actions</th>
                             </tr>
                             </thead>
                             <tbody id="sales-table-body">
@@ -1007,14 +1058,14 @@
         </div>
 
         <!-- TAB: ADMIN (SETTINGS / USERS / BACKUP) -->
-        <div id="tab-admin" class="tab-content hidden">
-            <div class="grid-two">
+        <div id="tab-admin" class="tab-content hidden">     
+            <div class="grid-50">
                 <!-- SHOP SETTINGS -->
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">
                             Shop Settings
-                            <span class="subheader-bn">· দোকান তথ্য</span>
+                            <span class="subheader-bn">· দোকানের তথ্য</span>
                         </h2>
                         <p class="card-sub">
                             Set shop name, address, phone. Used in header and receipts.
@@ -1033,8 +1084,61 @@
                             <label class="field-label">Phone</label>
                             <input id="shop-phone" type="text" class="field-input" autocomplete="off">
                         </div>
-                        <button id="btn-save-shop-settings" class="btn btn-primary btn-xl" type="button">
-                            💾 Save settings
+                        <div class="field">
+                            <label class="field-label">Shop Logo (max 200KB)</label>
+                            <input id="shop-logo-input" type="file" accept="image/*" class="field-input" style="padding: 8px;">
+                            <div id="shop-logo-preview" style="margin-top: 10px; display: none;">
+                                <img id="shop-logo-preview-img" style="max-width: 200px; max-height: 100px; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 8px; padding: 4px; background: #fff;">
+                                <button id="btn-remove-logo" class="btn btn-ghost" type="button" style="margin-left: 10px; padding: 4px 12px;">Remove Logo</button>
+                            </div>
+                        </div>
+                        <button id="btn-save-shop-settings" class="btn btn-ghost btn-xl" type="button">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                            Save settings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- GLOBAL SETTINGS -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            Global Settings
+                            <span class="subheader-bn">· গ্লোবাল সেটিংস</span>
+                        </h2>
+                        <p class="card-sub">
+                            Application-wide preferences and defaults.
+                        </p>
+                    </div>
+                    <div class="card-body stack-gap">
+                        <div class="stack-gap">
+                            <div class="field">
+                                <label class="field-label">Currency Symbol</label>
+                                <input id="global-currency-symbol" type="text" class="field-input" value="৳" maxlength="3" autocomplete="off">
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Default Print Size</label>
+                                <select id="global-print-size" class="field-input">
+                                    <option value="a4">A4 (210mm × 297mm)</option>
+                                    <option value="80mm">80mm Thermal</option>
+                                    <option value="58mm">58mm Thermal</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Default Print Template</label>
+                                <select id="global-print-template" class="field-input">
+                                    <option value="standard">Standard</option>
+                                    <option value="compact">Compact</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="btn-save-global-settings" class="btn btn-ghost btn-xl" type="button">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                            Save global settings
                         </button>
                     </div>
                 </div>
@@ -1089,8 +1193,11 @@
                             </div>
                         </div>
                         <div class="input-row">
-                            <button id="btn-save-user" class="btn btn-primary btn-xl" type="button">
-                                💾 Save user
+                            <button id="btn-save-user" class="btn btn-ghost btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                </svg>
+                                Save user
                             </button>
                             <button id="btn-new-user" class="btn btn-ghost btn-xl" type="button">
                                 + New
@@ -1101,36 +1208,36 @@
                         </p>
                     </div>
                 </div>
-            </div>
 
-            <!-- BACKUP / RESTORE -->
-            <div class="card card-full">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        Backup &amp; Restore
-                        <span class="subheader-bn">· ব্যাকআপ</span>
-                    </h2>
-                    <p class="card-sub">
-                        Download a JSON backup of products, customers, sales, users, and settings.
-                        Restore only if you trust the file.
-                    </p>
-                </div>
-                <div class="card-body stack-gap">
-                    <div class="input-row">
-                        <button id="btn-backup-download" class="btn btn-primary btn-xl" type="button">
-                            ⬇ Download backup (JSON)
-                        </button>
-                        <label class="btn btn-ghost btn-xl file-label">
-                            ⬆ Restore from file
-                            <input id="backup-file-input" type="file" accept=".json" hidden>
-                        </label>
+                 <!-- BACKUP / RESTORE -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            Backup &amp; Restore
+                            <span class="subheader-bn">· ব্যাকআপ</span>
+                        </h2>
+                        <p class="card-sub">
+                            Download a JSON backup of products, customers, sales, users, and settings.
+                            Restore only if you trust the file.
+                        </p>
                     </div>
-                    <p class="hint-text">
-                        Backup includes: users, products, customers, sales, and shop settings. Restoring will replace
-                        current local data.
-                    </p>
+                    <div class="card-body stack-gap">
+                        <div class="input-row">
+                            <button id="btn-backup-download" class="btn btn-primary btn-xl" type="button">
+                                ⬇ Download backup (JSON)
+                            </button>
+                            <label class="btn btn-ghost btn-xl file-label">
+                                ⬆ Restore from file
+                                <input id="backup-file-input" type="file" accept=".json" hidden>
+                            </label>
+                        </div>
+                        <p class="hint-text">
+                            Backup includes: users, products, customers, sales, and shop settings. Restoring will replace
+                            current local data.
+                        </p>
+                    </div>
                 </div>
-            </div>
+            </div>           
         </div>
     </section>
 </div>

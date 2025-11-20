@@ -18,12 +18,22 @@
 
     function saveDb(nextDb) {
         if (window.LitePos && window.LitePos.api && typeof window.LitePos.api.saveDb === 'function') {
-            try { window.LitePos.api.saveDb(nextDb); return; } catch (e) { console.error(e); }
+            try { 
+                window.LitePos.api.saveDb(nextDb);
+                // Ensure state.db is also updated
+                window.LitePos.state = window.LitePos.state || {};
+                window.LitePos.state.db = nextDb;
+                return; 
+            } catch (e) { console.error(e); }
         }
         try {
             localStorage.setItem(KEY, JSON.stringify(nextDb));
             window.LitePos.state = window.LitePos.state || {};
             window.LitePos.state.db = nextDb;
+            // Also update window.db for backward compatibility
+            if (typeof window.db !== 'undefined') {
+                window.db = nextDb;
+            }
         } catch (e) { console.error('admin.saveDb failed', e); }
     }
 
@@ -43,6 +53,16 @@
         els['shop-name'].value = (db.shop && db.shop.name) || '';
         els['shop-address'].value = (db.shop && db.shop.address) || '';
         els['shop-phone'].value = (db.shop && db.shop.phone) || '';
+        
+        // Load logo preview if exists
+        const logoPreview = els['shop-logo-preview'];
+        const logoImg = els['shop-logo-preview-img'];
+        if (db.shop && db.shop.logo && logoPreview && logoImg) {
+            logoImg.src = db.shop.logo;
+            logoPreview.style.display = 'block';
+        } else if (logoPreview) {
+            logoPreview.style.display = 'none';
+        }
     }
 
     function saveShopSettingsFromForm() {
@@ -53,11 +73,181 @@
         db.shop.name = (els['shop-name'] && els['shop-name'].value.trim()) || 'Shop';
         db.shop.address = (els['shop-address'] && els['shop-address'].value.trim()) || '';
         db.shop.phone = (els['shop-phone'] && els['shop-phone'].value.trim()) || '';
+        // Logo is saved separately via handleLogoUpload, preserve existing logo
         saveDb(db);
         if (window.LitePos && window.LitePos.ui && typeof window.LitePos.ui.loadShopIntoHeader === 'function') {
             try { window.LitePos.ui.loadShopIntoHeader(); } catch (e) { console.error(e); }
         }
         showToast('Settings saved', 'Shop settings updated.', 'success');
+    }
+
+    function handleLogoUpload(ev) {
+        const file = ev.target.files && ev.target.files[0];
+        if (!file) return;
+        
+        // Validate file type
+        if (!file.type.match(/^image\//)) {
+            showToast('Logo Error', 'Please select an image file.', 'error');
+            ev.target.value = '';
+            return;
+        }
+        
+        // Validate file size (200KB = 204800 bytes)
+        if (file.size > 204800) {
+            showToast('Logo Error', 'Image must be under 200KB. Please resize and try again.', 'error');
+            ev.target.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result;
+            const state = getState();
+            const db = state.db || {};
+            db.shop = db.shop || {};
+            db.shop.logo = base64;
+            saveDb(db);
+            
+            // Update preview
+            const els = getEls();
+            const logoPreview = els['shop-logo-preview'];
+            const logoImg = els['shop-logo-preview-img'];
+            if (logoPreview && logoImg) {
+                logoImg.src = base64;
+                logoPreview.style.display = 'block';
+            }
+            
+            // Update header logo
+            if (window.LitePos && window.LitePos.ui && typeof window.LitePos.ui.loadShopIntoHeader === 'function') {
+                try { window.LitePos.ui.loadShopIntoHeader(); } catch (e) { console.error(e); }
+            }
+            
+            showToast('Logo uploaded', 'Shop logo saved successfully.', 'success');
+        };
+        reader.onerror = () => {
+            showToast('Logo Error', 'Failed to read image file.', 'error');
+            ev.target.value = '';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function removeLogo() {
+        const state = getState();
+        const db = state.db || {};
+        db.shop = db.shop || {};
+        delete db.shop.logo;
+        saveDb(db);
+        
+        // Clear preview
+        const els = getEls();
+        const logoPreview = els['shop-logo-preview'];
+        const logoInput = els['shop-logo-input'];
+        if (logoPreview) logoPreview.style.display = 'none';
+        if (logoInput) logoInput.value = '';
+        
+        // Update header
+        if (window.LitePos && window.LitePos.ui && typeof window.LitePos.ui.loadShopIntoHeader === 'function') {
+            try { window.LitePos.ui.loadShopIntoHeader(); } catch (e) { console.error(e); }
+        }
+        
+        showToast('Logo removed', 'Shop logo has been removed.', 'success');
+    }
+
+    function loadGlobalSettings() {
+        const state = getState();
+        
+        // Ensure state.db exists
+        if (!state.db) {
+            const raw = localStorage.getItem(KEY);
+            if (raw) {
+                try {
+                    state.db = JSON.parse(raw);
+                } catch (e) {
+                    console.error('Failed to parse db from localStorage', e);
+                }
+            }
+        }
+        
+        const db = state.db || {};
+        const settings = db.settings || {};
+        
+        // Get elements directly
+        const currencyInput = document.getElementById('global-currency-symbol');
+        const printSizeInput = document.getElementById('global-print-size');
+        const printTemplateInput = document.getElementById('global-print-template');
+        
+        if (currencyInput) {
+            currencyInput.value = settings.currency || '৳';
+        }
+        if (printSizeInput) {
+            printSizeInput.value = settings.defaultPrintSize || 'a4';
+        }
+        if (printTemplateInput) {
+            printTemplateInput.value = settings.defaultPrintTemplate || 'standard';
+        }
+    }
+
+    function saveGlobalSettings() {
+        console.log('[admin.js] saveGlobalSettings called');
+        const state = getState();
+        
+        console.log('[admin.js] state:', state);
+        
+        // Ensure state.db exists and is initialized
+        if (!state.db) {
+            // Load from localStorage if not in state
+            const raw = localStorage.getItem(KEY);
+            if (raw) {
+                try {
+                    state.db = JSON.parse(raw);
+                    console.log('[admin.js] Loaded db from localStorage');
+                } catch (e) {
+                    console.error('Failed to parse db from localStorage', e);
+                    state.db = {};
+                }
+            } else {
+                state.db = {};
+                console.log('[admin.js] Created new empty db');
+            }
+        }
+        
+        const db = state.db;
+        db.settings = db.settings || {};
+        
+        // Get elements directly, not from cache
+        const currencyInput = document.getElementById('global-currency-symbol');
+        const printSizeInput = document.getElementById('global-print-size');
+        const printTemplateInput = document.getElementById('global-print-template');
+        
+        console.log('[admin.js] Currency input:', currencyInput, 'value:', currencyInput?.value);
+        console.log('[admin.js] Print size input:', printSizeInput, 'value:', printSizeInput?.value);
+        console.log('[admin.js] Print template input:', printTemplateInput, 'value:', printTemplateInput?.value);
+        
+        db.settings.currency = (currencyInput && currencyInput.value.trim()) || '৳';
+        db.settings.defaultPrintSize = (printSizeInput && printSizeInput.value) || 'a4';
+        db.settings.defaultPrintTemplate = (printTemplateInput && printTemplateInput.value) || 'standard';
+        
+        console.log('[admin.js] Saving settings:', db.settings);
+        
+        // Save to localStorage and state
+        saveDb(db);
+        state.db = db;
+        window.LitePos.state.db = db;
+        
+        console.log('[admin.js] After save - localStorage:', localStorage.getItem(KEY));
+        console.log('[admin.js] After save - state.db.settings:', state.db.settings);
+        
+        // Update header with new currency symbol
+        if (window.LitePos && window.LitePos.ui && typeof window.LitePos.ui.loadShopIntoHeader === 'function') {
+            try { window.LitePos.ui.loadShopIntoHeader(); } catch (e) { console.error(e); }
+        }
+        
+        // Refresh all money displays with new currency
+        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.updateSaleTotals === 'function') {
+            try { window.LitePos.pos.updateSaleTotals(); } catch (e) { console.error(e); }
+        }
+        
+        showToast('Settings saved', 'Global settings updated successfully.', 'success');
     }
 
     function renderUsersTable() {
@@ -196,6 +386,10 @@
     // Expose
     window.LitePos.admin.loadShopForm = loadShopForm;
     window.LitePos.admin.saveShopSettingsFromForm = saveShopSettingsFromForm;
+    window.LitePos.admin.handleLogoUpload = handleLogoUpload;
+    window.LitePos.admin.removeLogo = removeLogo;
+    window.LitePos.admin.loadGlobalSettings = loadGlobalSettings;
+    window.LitePos.admin.saveGlobalSettings = saveGlobalSettings;
     window.LitePos.admin.renderUsersTable = renderUsersTable;
     window.LitePos.admin.loadUserToForm = loadUserToForm;
     window.LitePos.admin.clearUserForm = clearUserForm;

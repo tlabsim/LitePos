@@ -6,7 +6,8 @@
 
     ns.utils.formatMoney = function (value) {
         const num = Number(value || 0);
-        return '৳ ' + num.toFixed(2);
+        const currency = (ns.state?.db?.settings?.currency) || '৳';
+        return currency + ' ' + num.toFixed(2);
     };
 
     ns.utils.shortMoney = function (value) {

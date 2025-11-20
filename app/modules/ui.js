@@ -5,6 +5,18 @@
     ns.ui = ns.ui || {};
     ns.state = ns.state || {};
 
+    // Dynamic element getter with lazy caching
+    // Elements are cached on first access, works for both static and dynamic elements
+    ns.ui.getElement = function (id) {
+        if (!ns.elements) ns.elements = {};
+        if (!ns.elements[id]) {
+            const el = document.getElementById(id);
+            if (el) ns.elements[id] = el;
+        }
+        return ns.elements[id] || null;
+    };
+
+    // Static element caching for known elements at startup (performance optimization)
     ns.ui.cacheElements = function () {
         const ids = [
             'login-screen', 'main-screen',
@@ -43,7 +55,8 @@
 
         ns.elements = ns.elements || {};
         ids.forEach(id => {
-            ns.elements[id] = document.getElementById(id);
+            const el = document.getElementById(id);
+            if (el) ns.elements[id] = el;
         });
         ns.elements.navButtons = Array.from(document.querySelectorAll('.nav-btn')) || [];
         ns.elements.navAdminButtons = Array.from(document.querySelectorAll('.nav-admin-only')) || [];

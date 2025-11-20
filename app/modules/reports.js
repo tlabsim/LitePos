@@ -14,6 +14,14 @@
 
     function _getDb() { return state.db || (window.db || {}); }
     function _getEls() { return window.LitePos.elements || {}; }
+    // For static elements - uses cached lookup via ui.getElement()
+    function _getEl(id) { 
+        return (UI && typeof UI.getElement === 'function') ? UI.getElement(id) : document.getElementById(id); 
+    }
+    // For dynamic elements - always fresh lookup, no caching
+    function _getById(id) {
+        return document.getElementById(id);
+    }
     function formatMoney(v) { if (UTILS && typeof UTILS.formatMoney === 'function') return UTILS.formatMoney(v); const n = Number(v || 0); return '৳ ' + n.toFixed(2); }
     function shortMoney(v) { if (UTILS && typeof UTILS.shortMoney === 'function') return UTILS.shortMoney(v); const n = Number(v || 0); if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'; if (n >= 1000) return (n / 1000).toFixed(1) + 'k'; return n.toFixed(0); }
     function toDateInput(d) { if (UTILS && typeof UTILS.toDateInput === 'function') return UTILS.toDateInput(d); const date = d instanceof Date ? d : new Date(d); const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`; }
@@ -34,20 +42,20 @@
         let totalProfit = 0;
         closed.forEach(s => { totalValue += s.total || 0; totalProfit += computeProfitForSale(s); });
 
-        if (els['kpi-total-sales']) els['kpi-total-sales'].textContent = formatMoney(totalValue);
-        if (els['kpi-total-sales-count']) els['kpi-total-sales-count'].textContent = `${closed.length} invoices`;
-        if (els['kpi-total-profit']) els['kpi-total-profit'].textContent = formatMoney(totalProfit);
-        if (els['kpi-profit-margin']) els['kpi-profit-margin'].textContent = totalValue > 0 ? `${((totalProfit / totalValue) * 100).toFixed(1)}% margin` : '—';
+        if (_getEl('kpi-total-sales')) _getEl('kpi-total-sales').textContent = formatMoney(totalValue);
+        if (_getEl('kpi-total-sales-count')) _getEl('kpi-total-sales-count').textContent = `${closed.length} invoices`;
+        if (_getEl('kpi-total-profit')) _getEl('kpi-total-profit').textContent = formatMoney(totalProfit);
+        if (_getEl('kpi-profit-margin')) _getEl('kpi-profit-margin').textContent = totalValue > 0 ? `${((totalProfit / totalValue) * 100).toFixed(1)}% margin` : '—';
 
         const todayStr = toDateInput(new Date());
         let todayValue = 0; let todayCount = 0;
         closed.forEach(s => { const dStr = toDateInput(new Date(s.createdAt || s.updatedAt || new Date())); if (dStr === todayStr) { todayValue += s.total || 0; todayCount++; } });
-        if (els['kpi-today-sales']) els['kpi-today-sales'].textContent = formatMoney(todayValue);
-        if (els['kpi-today-sales-count']) els['kpi-today-sales-count'].textContent = `${todayCount} invoices`;
+        if (_getEl('kpi-today-sales')) _getEl('kpi-today-sales').textContent = formatMoney(todayValue);
+        if (_getEl('kpi-today-sales-count')) _getEl('kpi-today-sales-count').textContent = `${todayCount} invoices`;
 
-        if (els['kpi-customers-count']) els['kpi-customers-count'].textContent = String((db.customers || []).length || 0);
+        if (_getEl('kpi-customers-count')) _getEl('kpi-customers-count').textContent = String((db.customers || []).length || 0);
         const openCount = (db.sales || []).filter(s => s.status === 'open').length;
-        if (els['kpi-open-sales']) els['kpi-open-sales'].textContent = String(openCount);
+        if (_getEl('kpi-open-sales')) _getEl('kpi-open-sales').textContent = String(openCount);
 
         renderTodaySnapshot();
     }
@@ -66,15 +74,15 @@
             }
         });
 
-        if (els['today-summary-small']) els['today-summary-small'].textContent = todayCount ? `${todayCount} sale(s) · ${formatMoney(todayValue)}` : 'No sales yet today.';
-        if (els['today-salesperson-name']) els['today-salesperson-name'].textContent = window.currentUser ? window.currentUser.name : '—';
-        if (els['today-last-sale']) els['today-last-sale'].textContent = lastSale ? `${lastSale.id} · ${formatMoney(lastSale.total || 0)}` : '—';
+        if (_getEl('today-summary-small')) _getEl('today-summary-small').textContent = todayCount ? `${todayCount} sale(s) · ${formatMoney(todayValue)}` : 'No sales yet today.';
+        if (_getEl('today-salesperson-name')) _getEl('today-salesperson-name').textContent = window.currentUser ? window.currentUser.name : '—';
+        if (_getEl('today-last-sale')) _getEl('today-last-sale').textContent = lastSale ? `${lastSale.id} · ${formatMoney(lastSale.total || 0)}` : '—';
     }
 
     function drawSalesChart() {
         const els = _getEls();
         const db = _getDb();
-        const canvas = els['salesChart'];
+        const canvas = _getEl('salesChart');
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const width = canvas.clientWidth || 400; const height = 200; canvas.width = width; canvas.height = height;
@@ -97,7 +105,7 @@
     function exportCsvReport() {
         const els = _getEls();
         const db = _getDb();
-        const from = els['report-from'] && els['report-from'].value; const to = els['report-to'] && els['report-to'].value;
+        const from = _getEl('report-from') && _getEl('report-from').value; const to = _getEl('report-to') && _getEl('report-to').value;
         const closed = (db.sales || []).filter(s => s.status === 'closed');
         const filtered = closed.filter(s => { if (!from && !to) return true; const dStr = toDateInput(new Date(s.createdAt || s.updatedAt || new Date())); if (from && dStr < from) return false; if (to && dStr > to) return false; return true; });
         if (!filtered.length) { if (UI && typeof UI.showToast === 'function') UI.showToast('Export', 'No closed sales in selected period.', 'error'); else console.error('No closed sales in selected period.'); return; }
@@ -111,14 +119,14 @@
     function printReport() {
         const els = _getEls();
         const db = _getDb();
-        const from = els['report-from'] && els['report-from'].value; const to = els['report-to'] && els['report-to'].value;
+        const from = _getEl('report-from') && _getEl('report-from').value; const to = _getEl('report-to') && _getEl('report-to').value;
         const closed = (db.sales || []).filter(s => s.status === 'closed');
         const filtered = closed.filter(s => { if (!from && !to) return true; const dStr = toDateInput(new Date(s.createdAt || s.updatedAt || new Date())); if (from && dStr < from) return false; if (to && dStr > to) return false; return true; });
-        const tbody = els['report-print-body']; if (!tbody) return; tbody.innerHTML = '';
+        const tbody = _getEl('report-print-body'); if (!tbody) return; tbody.innerHTML = '';
         const byDay = {};
         filtered.forEach(s => { const dStr = toDateInput(new Date(s.createdAt || s.updatedAt || new Date())); if (!byDay[dStr]) byDay[dStr] = { invoices: 0, total: 0, profit: 0 }; byDay[dStr].invoices++; byDay[dStr].total += s.total || 0; byDay[dStr].profit += computeProfitForSale(s); });
         Object.keys(byDay).sort().forEach(day => { const row = byDay[day]; const tr = document.createElement('tr'); const tdDate = document.createElement('td'); tdDate.textContent = day; const tdInv = document.createElement('td'); tdInv.textContent = String(row.invoices); const tdTotal = document.createElement('td'); tdTotal.textContent = formatMoney(row.total); const tdProfit = document.createElement('td'); tdProfit.textContent = formatMoney(row.profit); tr.appendChild(tdDate); tr.appendChild(tdInv); tr.appendChild(tdTotal); tr.appendChild(tdProfit); tbody.appendChild(tr); });
-        if (els['report-print-period']) els['report-print-period'].textContent = `Period: ${from || '—'} to ${to || '—'}`;
+        if (_getEl('report-print-period')) _getEl('report-print-period').textContent = `Period: ${from || '—'} to ${to || '—'}`;
         document.body.classList.add('print-report'); window.print(); setTimeout(() => document.body.classList.remove('print-report'), 500);
     }
 

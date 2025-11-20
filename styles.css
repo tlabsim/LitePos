@@ -17,9 +17,10 @@
     --radius-pill: 999px;
     --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.9);
     --shadow-glow: 0 0 0 1px rgba(34, 197, 94, 0.15), 0 18px 45px rgba(15, 23, 42, 0.9);
-    --shadow-card: 0 22px 60px rgba(26, 35, 56, 0.9);
+    --shadow-card: 0 2px 60px rgba(22, 28, 41, 0.697);
     --glass-bg: rgba(15, 23, 42, 0.84);
-    --glass-border: rgba(148, 163, 184, 0.382);
+    --glass-border: rgba(63, 76, 95, 0.121);
+    --glass-border-top: rgba(94, 107, 126, 0.136);
     --focus-ring: 0 0 0 1px rgba(148, 163, 184, 0.4), 0 0 0 2px rgba(34, 197, 94, 0.7);
     --font-main: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 }
@@ -42,7 +43,7 @@ body {
     margin: 0;
     padding: 0;    
     color: var(--text);
-    background: radial-gradient(circle at top left, #0f172a, #020617 55%, #000 80%);
+    background: radial-gradient(circle at top left, #0f172a, #0e142e 55%, #10101a 80%);
     font-family: var(--font-main);
     -webkit-font-smoothing: antialiased;
 }
@@ -90,7 +91,20 @@ body {
     color: #022c22;
     font-weight: 800;
     font-size: 20px;
-    box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.6), 0 0px 30px rgba(34, 197, 94, 0.9);
+    box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.6), 0 0px 30px rgba(34, 197, 94, 0.9);  
+}
+
+.header-logo-img{
+    width: auto;
+    height: 40px;
+    border-radius: 10px;
+}
+
+.logo-mark:has(.header-logo-img) {
+    width: auto;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
 }
 
 .logo-text {
@@ -165,12 +179,18 @@ body {
     background: radial-gradient(circle at top left, rgba(74, 115, 173, 0.08), rgba(23, 32, 53, 0.96));
     border-radius: var(--radius-lg);
     border: 1px solid var(--glass-border);
+    border-top: 2px solid var(--glass-border-top);
     box-shadow: var(--shadow-card);
     padding: 16px 16px 18px;
     display: flex;
     flex-direction: column;
     gap: 10px;
     min-height: 0;
+    transition: background 1s ease;
+}
+
+.card:hover{
+    background: radial-gradient(circle at top left, rgba(74, 115, 173, 0.08), rgba(23, 32, 53, 0.8));
 }
 
 .card-large {
@@ -189,12 +209,12 @@ body {
 }
 
 .card-title {
-    font-size: 17px;
+    font-size: 24px;
     font-weight: 600;
     display: flex;
     align-items: baseline;
     gap: 6px;
-    margin-bottom: .5em;
+    margin: .5em 0;
 }
 
 .subheader-bn {
@@ -215,6 +235,8 @@ body {
     gap: 14px;
 }
 
+/* Stacks */
+
 .stack-gap {
     display: flex;
     flex-direction: column;
@@ -232,6 +254,24 @@ body {
     flex-direction: column;
     gap: 0;
 }
+
+/* Flex rows */
+.row-gap {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+}
+
+.row-between {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+
 
 /* Grids */
 
@@ -252,6 +292,12 @@ body {
 .grid-two {
     display: grid;
     grid-template-columns: 1.4fr 1.2fr;
+    gap: 14px;
+}
+
+.grid-50 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 14px;
 }
 
@@ -402,6 +448,12 @@ select.field-input option:hover {
     display: grid;
     grid-template-columns: 1.1fr 1.1fr;
     gap: 10px;
+}
+
+.three-col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
 }
 
 /* Buttons */
@@ -734,13 +786,19 @@ select.field-input option:hover {
     font-weight: 500;
 }
 
+.section-title-large {
+    font-size: 15px;
+    font-weight: 700;
+}
+
 .section-sub {
     font-size: 11px;
     color: var(--text-soft);
 }
 
 .cart-count-chip {
-    font-size: 11px;
+    font-size: 15px;
+    font-weight: 700;
     color: var(--accent);
     border: 1px solid rgba(34, 197, 94, 0.4);
     border-radius: var(--radius-pill);
@@ -798,11 +856,11 @@ td {
 }
 
 th {
-    font-weight: 500;
-    font-size: 11px;
-    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
 }
 
 tbody tr {
@@ -861,8 +919,20 @@ tbody tr.low-stock-row {
 
 .sale-control-row {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
     gap: 10px;
+}
+
+.sale-buttons-left {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sale-buttons-right {
+    display: flex;
+    gap: 8px;
 }
 
 .open-sales-strip {
@@ -905,6 +975,161 @@ tbody tr.low-stock-row {
 .open-sales-table tbody td {
     padding: 12px;
     color: var(--text-primary);
+}
+
+/* Sales global summary */
+#sales-global-summary-container {
+    margin-bottom: 16px;
+}
+
+.sales-global-summary {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.12), rgba(59, 130, 246, 0.08));
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    border-radius: var(--radius-md);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+.sales-global-summary .summary-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 150px;
+}
+
+.sales-global-summary .summary-stats {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.sales-global-summary .summary-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 120px;
+}
+
+.sales-global-summary .summary-stat .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+}
+
+.sales-global-summary .summary-stat .stat-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Sales date group styling */
+.sales-date-group {
+    margin-bottom: 20px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.6), rgba(2, 6, 23, 0.8));
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.sales-date-header {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.1));
+    border-bottom: 2px solid rgba(34, 197, 94, 0.3);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.sales-date-header .date-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    letter-spacing: 0.02em;
+}
+
+.sales-date-header .date-stats {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.sales-date-header .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    background: rgba(15, 23, 42, 0.6);
+    min-width: 100px;
+}
+
+.sales-date-header .stat-item .stat-value {
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text);
+    line-height: 1;
+}
+
+.sales-date-header .stat-item .stat-label {
+    font-weight: 500;
+    font-size: 11px;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sales-date-header .stat-item.stat-count .stat-value {
+    color: var(--accent);
+}
+
+.sales-date-header .stat-item.stat-total .stat-value {
+    color: #3b82f6;
+}
+
+.sales-date-header .stat-item.stat-profit .stat-value {
+    color: #22c55e;
+}
+
+.sales-date-group table {
+    background: transparent;
+}
+
+.sales-date-group tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+.sales-date-group tbody tr:hover {
+    background: radial-gradient(circle at top left, rgba(34, 197, 94, 0.08), rgba(15, 23, 42, 0.6));
+}
+
+.sales-date-group tbody td {
+    padding: 12px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(31, 41, 55, 0.5);
+}
+
+.sales-date-group tbody tr:last-child td {
+    border-bottom: none;
 }
 
 /* Legacy pill styles (can be removed if not needed) */
@@ -1137,6 +1362,12 @@ tbody tr.low-stock-row {
     backdrop-filter: blur(8px);
     z-index: 40;
     box-shadow: 0 0 20px rgba(25, 29, 28, 0.2), 0 18px 45px rgba(2,6,23,0.9);
+}
+
+.product-overlay-inner tr.selected {
+    background: rgba(20, 184, 166, 0.3);
+    outline: 2px solid rgba(20, 184, 166, 0.6);
+    outline-offset: -2px;
 }
 
 /* Sale header: place title and right area on same row */
@@ -1373,11 +1604,22 @@ tbody tr.low-stock-row {
 
 .receipt-print {
     display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -9999;
+    color: #000;
+    background: #fff;
 }
 
 .receipt-inner {
     font-size: 13px;
     font-family: system-ui, sans-serif;
+    color: #000;
+    background: #fff;
+    padding: 20px;
 }
 
 .receipt-inner h2 {
@@ -1385,16 +1627,47 @@ tbody tr.low-stock-row {
     text-align: center;
 }
 
+.receipt-header {
+    text-align: center;
+    color: #000;
+}
+
+.receipt-logo {
+    display: block;
+    margin: 0 auto 10px;
+    max-width: 120px;
+    max-height: 80px;
+}
+
+.receipt-logo-compact {
+    display: block;
+    margin: 0 auto 5px;
+    max-width: 80px;
+    max-height: 50px;
+}
+
+.receipt-table-compact th:nth-child(4),
+.receipt-table-compact td:nth-child(4) {
+    text-align: right;
+}
+
 .receipt-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 8px;
+    color: #000;
 }
 
 .receipt-table th,
 .receipt-table td {
     border-bottom: 1px solid #ccc;
     padding: 4px;
+    color: #000;
+}
+
+.receipt-table th:nth-child(4),
+.receipt-table td:nth-child(4) {
+    text-align: right;
 }
 
 .receipt-totals {
@@ -1402,11 +1675,21 @@ tbody tr.low-stock-row {
     display: flex;
     flex-direction: column;
     gap: 3px;
+    color: #000;
 }
 
 .receipt-totals div {
     display: flex;
     justify-content: space-between;
+    color: #000;
+    text-align: right;
+}
+
+.receipt-totals div:nth-last-child(3) {
+    font-weight: bold;
+    font-size: 1.1em;
+    border-top: 1px solid #000;
+    padding-top: 4px;
 }
 
 .receipt-note {
@@ -1414,6 +1697,51 @@ tbody tr.low-stock-row {
     text-align: center;
     font-size: 12px;
     font-style: italic;
+    color: #000;
+}
+
+/* Compact template styles */
+
+.receipt-header-compact {
+    text-align: center;
+    margin-bottom: 8px;
+    color: #000;
+}
+
+.receipt-table-compact {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    color: #000;
+    font-size: 10px;
+}
+
+.receipt-table-compact th,
+.receipt-table-compact td {
+    border-bottom: 1px solid #ccc;
+    padding: 3px 2px;
+    color: #000;
+}
+
+.receipt-totals-compact {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: #000;
+}
+
+.receipt-totals-compact div {
+    display: flex;
+    justify-content: space-between;
+    color: #000;
+    text-align: right;
+}
+
+.receipt-totals-compact div:nth-last-child(3) {
+    font-weight: bold;
+    border-top: 1px solid #000;
+    padding-top: 2px;
 }
 
 /* Print styles */
@@ -1442,6 +1770,21 @@ tbody tr.low-stock-row {
     /* Show only receipt or report area depending on print mode */
     body.print-receipt .receipt-print {
         display: block !important;
+        position: static !important;
+        z-index: 9999 !important;
+        color: #000 !important;
+        background: #fff !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+    
+    body.print-receipt .receipt-inner {
+        color: #000 !important;
+        background: #fff !important;
+    }
+    
+    body.print-receipt .receipt-inner * {
+        color: #000 !important;
     }
 
     body.print-report .report-print-area {
@@ -1466,27 +1809,80 @@ tbody tr.low-stock-row {
     /* Dynamic receipt sizes via body class */
     body.receipt-a4.print-receipt .receipt-inner {
         width: 100%;
+        max-width: 210mm;
     }
 
-    body.receipt-80mm.print-receipt .receipt-inner,
+    body.receipt-80mm.print-receipt .receipt-inner {
+        width: 80mm;
+        max-width: 80mm;
+        font-size: 12px;
+    }
+    
+    body.receipt-80mm.print-receipt .receipt-header h2 {
+        font-size: 18px;
+    }
+    
+    body.receipt-80mm.print-receipt .receipt-table {
+        font-size: 11px;
+    }
+
     body.receipt-58mm.print-receipt .receipt-inner {
-        width: 100%;
+        width: 58mm;
+        max-width: 58mm;
+        font-size: 10px;
     }
+    
+    body.receipt-58mm.print-receipt .receipt-header h2,
+    body.receipt-58mm.print-receipt .receipt-header-compact h3 {
+        font-size: 14px;
+    }
+    
+    body.receipt-58mm.print-receipt .receipt-table,
+    body.receipt-58mm.print-receipt .receipt-table-compact {
+        font-size: 9px;
+    }
+}
 
+/* Page size rules - must be outside @media print for Chrome/Edge */
+@page {
+    size: A4 portrait;
+    margin: 10mm;
+}
+
+@media print {
     @page {
+        size: A4 portrait;
         margin: 10mm;
     }
+}
 
-    body.receipt-a4.print-receipt @page {
-        size: A4;
+/* Override page size for thermal receipts */
+@media print {
+    body.receipt-80mm.print-receipt ~ * {
+        display: none;
     }
+}
 
-    body.receipt-80mm.print-receipt @page {
-        size: 80mm auto;
+@page :first {
+    size: A4 portrait;
+}
+
+/* Thermal receipt page sizes */
+body.receipt-80mm.print-receipt {
+    @supports (size: 80mm auto) {
+        @page {
+            size: 80mm auto;
+            margin: 5mm;
+        }
     }
+}
 
-    body.receipt-58mm.print-receipt @page {
-        size: 58mm auto;
+body.receipt-58mm.print-receipt {
+    @supports (size: 58mm auto) {
+        @page {
+            size: 58mm auto;
+            margin: 3mm;
+        }
     }
 }
 
@@ -1512,12 +1908,16 @@ tbody tr.low-stock-row {
 
 /* Responsive */
 
-@media (max-width: 1100px) {
+@media (max-width: 1024px) {
     .grid-main {
         grid-template-columns: 1.4fr 1.1fr;
     }
 
     .grid-two {
+        grid-template-columns: 1fr;
+    }
+
+    .grid-50 {
         grid-template-columns: 1fr;
     }
 
