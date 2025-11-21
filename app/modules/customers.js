@@ -273,6 +273,11 @@
             if (_getEl('quick-customer-address')) _getEl('quick-customer-address').value = customer.address || '';
         }
         
+        // CRITICAL: Recalculate due/change when customer changes
+        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.updateSaleTotals === 'function') {
+            window.LitePos.pos.updateSaleTotals();
+        }
+        
         // Trigger auto-save after updating customer
         if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.autoSaveCurrentSale === 'function') {
             window.LitePos.pos.autoSaveCurrentSale();

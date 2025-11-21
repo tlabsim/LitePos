@@ -182,7 +182,12 @@
             const tr = document.createElement('tr');
             if (p.stock <= (p.lowStockAt || 0)) tr.classList.add('low-stock-row');
             tr.dataset.productId = p.id;
-            tr.addEventListener('click', () => loadProductToForm(p.id));
+            tr.addEventListener('click', () => {                
+                const previousSelected = document.querySelectorAll('.selected-product-row');
+                previousSelected.forEach(row => row.classList.remove('selected-product-row'));
+                tr.classList.add('selected-product-row');
+                loadProductToForm(p.id);
+            });
 
             const tdId = document.createElement('td'); 
             tdId.textContent = formatProductId(p.id); 
@@ -573,27 +578,22 @@
         if (!window.LitePos.state) window.LitePos.state = {};
         
         // Store selected product ID in state for persistence across renders
-        window.LitePos.state.selectedProductId = id;
-        
-        // Remove previous selection highlight
-        const previousSelected = document.querySelector('tr.selected-product-row');
-        if (previousSelected) {
-            previousSelected.classList.remove('selected-product-row');
+        window.LitePos.state.selectedProductId = id;  
+
+        if(_getEl('product-details-column')) {
+            _getEl('product-details-column').dataset.editing = 'true';
         }
-        
-        // Highlight current selected product row
-        // Use setTimeout to ensure DOM is fully rendered
-        setTimeout(() => {
-            const currentRow = document.querySelector(`tr[data-product-id="${id}"]`);
-            if (currentRow) {
-                console.log('Highlighting selected product row for ID:', id, currentRow);
-                console.log('Adding class to element:', currentRow.outerHTML.substring(0, 100));
-                currentRow.classList.add('selected-product-row');
-                console.log('Class added. Classes now:', currentRow.className);
-            } else {
-                console.warn('Could not find row element for product ID:', id);
+
+        if (_getEl('editing-product-header')) {
+            _getEl('editing-product-header').style.display = 'flex';
+            // Find <h3> inside header and set its content
+            const h3 = _getEl('editing-product-header').querySelector('h3');
+            if (h3) {
+                h3.textContent = `Editing Product: ${p.name} (${formatProductId(p.id)})`;
             }
-        }, 0);
+            //_getEl('editing-product-header').innerHTML = `<h3>Editing Product: ${p.name} (${formatProductId(p.id)})</h3>`;
+        } 
+
         if (_getEl('product-edit-name')) _getEl('product-edit-name').value = p.name;
         if (_getEl('product-edit-sku')) _getEl('product-edit-sku').value = p.sku || '';
         
@@ -799,12 +799,18 @@
         if (window.LitePos && window.LitePos.state) {
             window.LitePos.state.selectedProductId = null;
         }
+
+        if(_getEl('product-details-column')) {
+            _getEl('product-details-column').scrollTop = 0;
+            _getEl('product-details-column').dataset.editing = 'false';
+        }
         
         // Remove product selection highlight
         const selectedRow = document.querySelector('tr.selected-product-row');
         if (selectedRow) {
             selectedRow.classList.remove('selected-product-row');
         }
+        if (_getEl('editing-product-header'))  _getEl('editing-product-header').style.display = 'none';
         if (_getEl('product-edit-name')) _getEl('product-edit-name').value = '';
         if (_getEl('product-edit-sku')) _getEl('product-edit-sku').value = '';
         
@@ -842,6 +848,8 @@
         if (_getEl('stock-adjustment-qty')) _getEl('stock-adjustment-qty').value = '';
         if (_getEl('stock-adjustment-note')) _getEl('stock-adjustment-note').value = '';
     }
+
+    window.clearProductForm = clearProductForm; 
 
     function saveProductFromForm() {
         const els = _getEls();

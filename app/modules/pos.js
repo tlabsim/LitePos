@@ -100,6 +100,9 @@
         console.log('[startNewSale] Empty sale created, items:', ns.state.currentSale.items.length);
         ns.state.currentSale.customer = null;
         
+        // Clear original sale items tracking (used when editing sales)
+        ns.state.originalSaleItems = null;
+        
         // Clear customer from UI
         if (window.setCurrentCustomer) {
             window.setCurrentCustomer(null);
@@ -251,12 +254,21 @@
         const settings = db.settings || {};
         const enableDue = settings.enableDue !== false; // Default to true
         
-        // Calculate debt if payment < total AND customer is saved AND due is enabled
+        // Calculate debt if customer is saved AND due is enabled
+        // Show due even if payment is 0 (customer may want full amount on credit)
         const hasSavedCustomer = ns.state.currentSale.customer && ns.state.currentSale.customer.phone;
-        if (hasSavedCustomer && payment < total && enableDue) {
-            ns.state.currentSale.debt = total - payment;
-            ns.state.currentSale.change = 0;
+        if (hasSavedCustomer && enableDue) {
+            // If payment < total, there's a due amount
+            if (payment < total) {
+                ns.state.currentSale.debt = total - payment;
+                ns.state.currentSale.change = 0;
+            } else {
+                // Payment covers or exceeds total
+                ns.state.currentSale.debt = 0;
+                ns.state.currentSale.change = Math.max(0, payment - total);
+            }
         } else {
+            // No customer or due disabled - calculate normally
             ns.state.currentSale.debt = 0;
             ns.state.currentSale.change = Math.max(0, payment - total);
         }
@@ -385,8 +397,18 @@
         
         const totalQtyWithChange = totalQtyOtherEntries + newQty;
         
-        if (totalQtyWithChange > product.stock) { 
-            if (ns.ui) ns.ui.showToast('Stock limit', `Only ${product.stock} in stock.`, 'error'); 
+        // When editing a sale, account for original quantities already in the sale
+        // This gives back the stock that was reserved by the original sale
+        let availableStock = product.stock;
+        if (ns.state.originalSaleItems && Array.isArray(ns.state.originalSaleItems)) {
+            const originalQty = ns.state.originalSaleItems
+                .filter(it => it.productId === product.id)
+                .reduce((sum, it) => sum + it.qty, 0);
+            availableStock = product.stock + originalQty;
+        }
+        
+        if (totalQtyWithChange > availableStock) { 
+            if (ns.ui) ns.ui.showToast('Stock limit', `Only ${availableStock} available (${product.stock} in stock).`, 'error'); 
             return; 
         }
         
@@ -449,8 +471,18 @@
             .filter(it => it.productId === product.id)
             .reduce((sum, it) => sum + it.qty, 0);
         
-        if (totalQtyInCart + 1 > product.stock) { 
-            if (ns.ui) ns.ui.showToast('Stock limit', `Only ${product.stock} in stock.`, 'error'); 
+        // When editing a sale, account for original quantities already in the sale
+        // This gives back the stock that was reserved by the original sale
+        let availableStock = product.stock;
+        if (ns.state.originalSaleItems && Array.isArray(ns.state.originalSaleItems)) {
+            const originalQty = ns.state.originalSaleItems
+                .filter(it => it.productId === product.id)
+                .reduce((sum, it) => sum + it.qty, 0);
+            availableStock = product.stock + originalQty;
+        }
+        
+        if (totalQtyInCart + 1 > availableStock) { 
+            if (ns.ui) ns.ui.showToast('Stock limit', `Only ${availableStock} available (${product.stock} in stock).`, 'error'); 
             return; 
         }
         
@@ -682,6 +714,10 @@
         // Load the sale
         ns.state.currentSale = ns.utils ? ns.utils.structuredClone(sale) : JSON.parse(JSON.stringify(sale));
         
+        // Store original sale items for stock validation when editing
+        // This allows us to add back the original quantities when checking stock availability
+        ns.state.originalSaleItems = ns.utils ? ns.utils.structuredClone(sale.items) : JSON.parse(JSON.stringify(sale.items));
+        
         // Restore customer
         if (sale.customer && window.LitePos.customers && typeof window.LitePos.customers.setCurrentCustomer === 'function') {
             window.LitePos.customers.setCurrentCustomer(sale.customer);
@@ -709,7 +745,14 @@
             if (ns.ui) ns.ui.showToast('Hold sale', 'Cart is empty.', 'error');
             return;
         }
-        ns.state.currentSale.status = 'open';
+        
+        // Preserve the original status if editing an existing sale
+        // Only set to 'open' if this is a new sale (no ID yet)
+        if (!ns.state.currentSale.id) {
+            ns.state.currentSale.status = 'open';
+        }
+        // If editing an existing sale, keep its current status (open or closed)
+        
         ns.state.currentSale.updatedAt = new Date().toISOString();
         ns.state.currentSale.lastModifiedBy = (ns.state.currentUser && ns.state.currentUser.id) || ns.state.currentSale.lastModifiedBy;
         const now = new Date().toISOString();
@@ -879,10 +922,30 @@
             }
         }
         
-        const now = new Date().toISOString(); ns.state.currentSale.status = 'closed'; ns.state.currentSale.updatedAt = now; if (!ns.state.currentSale.createdAt) ns.state.currentSale.createdAt = now;
+        const now = new Date().toISOString(); 
+        const wasEditing = !!ns.state.currentSale.id; // Track if we were editing an existing sale
+        const wasClosedSale = ns.state.currentSale.status === 'closed'; // Track if it was already closed
+        
+        ns.state.currentSale.status = 'closed'; ns.state.currentSale.updatedAt = now; if (!ns.state.currentSale.createdAt) ns.state.currentSale.createdAt = now;
         ns.state.currentSale.lastModifiedBy = (ns.state.currentUser && ns.state.currentUser.id) || ns.state.currentSale.lastModifiedBy;
         if (!ns.state.currentSale.id) { const newId = 'S' + String(ns.state.db.counters.nextSaleId++).padStart(4, '0'); ns.state.currentSale.id = newId; }
-        ns.state.currentSale.items.forEach(it => { const product = ns.state.db.products.find(p => p.sku === it.sku); if (product) product.stock = Math.max(0, (product.stock || 0) - it.qty); });
+        
+        // Handle stock updates: if editing, restore original stock first, then deduct new quantities
+        if (wasEditing && ns.state.originalSaleItems && Array.isArray(ns.state.originalSaleItems)) {
+            // First, restore stock from original sale items
+            ns.state.originalSaleItems.forEach(it => {
+                const product = ns.state.db.products.find(p => p.id === it.productId);
+                if (product) {
+                    product.stock = (product.stock || 0) + it.qty;
+                }
+            });
+        }
+        // Now deduct current quantities
+        ns.state.currentSale.items.forEach(it => { 
+            const product = ns.state.db.products.find(p => p.id === it.productId); 
+            if (product) product.stock = Math.max(0, (product.stock || 0) - it.qty); 
+        });
+        
         const idx = ns.state.db.sales.findIndex(s => s.id === ns.state.currentSale.id);
         const saleCopy = ns.utils ? ns.utils.structuredClone(ns.state.currentSale) : JSON.parse(JSON.stringify(ns.state.currentSale));
         ns.state.db.sales[idx === -1 ? ns.state.db.sales.length : idx] = saleCopy;
@@ -897,8 +960,11 @@
         if (ns.ui) ns.ui.showToast('Sale completed', `Sale ${ns.state.currentSale.id} closed.`, 'success');
         if (ns.pos.fillReceiptFromSale) ns.pos.fillReceiptFromSale && ns.pos.fillReceiptFromSale(saleCopy);
         
-        // Clear auto-save after completing sale
+        // CRITICAL: Clear auto-save BEFORE starting new sale to prevent race condition
         if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
+        
+        // Clear original sale items tracking
+        ns.state.originalSaleItems = null;
         
         // Start new sale and clear everything
         ns.pos.startNewSale(true);

@@ -730,7 +730,7 @@
 
         <!-- TAB: PRODUCTS -->
         <div id="tab-products" class="tab-content hidden">
-            <div class="grid-main">
+            <div class="grid-main" style="position: relative;">
                 <!-- LEFT COLUMN: Products List -->
                 <div class="stack-gap">
                     <div class="card">
@@ -811,114 +811,132 @@
                     </div>
                 </div>
 
+                <style>
+                    #product-details-column[data-editing="true"] .add-edit-product-header {
+                        display: none;
+                    }
+                </style>
+
                 <!-- RIGHT COLUMN: Forms -->
-                <div class="stack-gap">
-                    <div class="stack-gap">
-                        <div class="card">
-                            <div class="card-header">
-                                <div>
-                                    <h2 class="card-title">
-                                        Add / Edit Product
-                                        <span class="subheader-bn">· পণ্য যোগ/সম্পাদনা</span>
-                                    </h2>
-                                    <p class="card-sub">
-                                        Tap a product row to load.
-                                    </p>
-                                </div>
+                <div id="product-details-column" class="ghost-scrollable" style="position:sticky !important; top: 0;" data-editing="false">
+                    <div id="editing-product-header" class="sticky-bar" style="display: none;">
+                        <h3>Editing product</h3>
+                        <button id="btn-clear-product-edit" class="btn btn-ghost btn-sm" type="button" title="Cancel edit">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <script>
+                            document.getElementById('btn-clear-product-edit').addEventListener('click', function() {
+                                window.clearProductForm();
+                            });
+                        </script>
+                    </div>
+                    <div class="card">
+                        <div class="card-header add-edit-product-header">
+                            <div>
+                                <h2 class="card-title">
+                                    Add / Edit Product
+                                    <span class="subheader-bn">· পণ্য যোগ/সম্পাদনা</span>
+                                </h2>
+                                <p class="card-sub">
+                                    Tap a product row to load.
+                                </p>
                             </div>
-                            <div class="card-body stack-gap">
-                                <div class="field">
-                                    <label class="field-label">Product Name</label>
-                                    <input id="product-edit-name" type="text" class="field-input" autocomplete="off">
-                                </div>
-                                <div class="field">
-                                    <label class="field-label">Barcode(s) <span style="font-weight: 400; font-size: 12px; color: var(--text-soft);">(Press Space or Comma to add)</span></label>
-                                    <div id="barcode-tag-container" class="field-input barcode-tag-container">
-                                        <!-- Barcode tags will be added here dynamically -->
-                                        <input id="product-edit-barcode" type="text" class="barcode-tag-input" autocomplete="off" placeholder="Scan or type barcode...">
-                                    </div>
-                                    <input id="product-edit-barcode-hidden" type="hidden">
-                                </div>
-                                <div class="two-col">
-                                    <div class="field">
-                                        <label class="field-label">SKU <span style="font-weight: 400; font-size: 12px; color: var(--text-soft);">(optional)</span></label>
-                                        <input id="product-edit-sku" type="text" class="field-input" autocomplete="off">
-                                    </div>
-                                    <div class="field">
-                                        <label class="field-label">Category</label>
-                                        <input id="product-edit-category" type="text" class="field-input" autocomplete="off" placeholder="e.g., Electronics, Food" list="category-suggestions">
-                                        <datalist id="category-suggestions">
-                                            <!-- Filled by JS -->
-                                        </datalist>
-                                    </div>
-                                </div>
-                                <div class="two-col">
-                                    <div class="field">
-                                        <label class="field-label">Brand</label>
-                                        <input id="product-edit-brand" type="text" class="field-input" autocomplete="off" placeholder="e.g., Samsung, Nike" list="brand-suggestions">
-                                        <datalist id="brand-suggestions">
-                                            <!-- Filled by JS -->
-                                        </datalist>
-                                    </div>
-                                    <div class="field">
-                                        <label class="field-label">Supplier</label>
-                                        <input id="product-edit-supplier" type="text" class="field-input" autocomplete="off" placeholder="e.g., ABC Traders" list="supplier-suggestions">
-                                        <datalist id="supplier-suggestions">
-                                            <!-- Filled by JS -->
-                                        </datalist>
-                                    </div>
-                                </div>
-                            </div>  
-                            <div class="two-col">
-                                <div class="field">
-                                    <label class="field-label">Buying Price (৳)</label>
-                                    <input id="product-edit-buy" type="number" class="field-input" min="0" step="1">
-                                </div>
-                                <div class="field">
-                                    <label class="field-label">Selling Price (৳)</label>
-                                    <input id="product-edit-sell" type="number" class="field-input" min="0" step="1">
-                                </div>
-                            </div>
-                            <div class="two-col">
-                                <div class="field">
-                                    <label class="field-label">Stock</label>
-                                    <input id="product-edit-stock" type="number" class="field-input" min="0" step="1">
-                                    <p class="hint-text" style="margin-top: 4px; font-size: 12px;">Stock can only be set for new products. For existing products, use stock adjustment below.</p>
-                                </div>
-                                <div class="field">
-                                    <label class="field-label">Low stock alert at</label>
-                                    <input id="product-edit-low" type="number" class="field-input" min="0" step="1">
-                                </div>
-                            </div>
-                            <div class="input-row">
-                                <button id="btn-save-product" class="btn btn-primary btn-xl" type="button">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-12L10.125 2.25z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 17.25h-9m9-4.5h-9m5.25-9v6.75h-6.75" />
-                                    </svg>
-                                    Save product
-                                </button>
-                                <button id="btn-new-product" class="btn btn-ghost btn-xl" type="button">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                    </svg>
-                                    New
-                                </button>
-                                <button id="btn-delete-product" class="btn btn-ghost btn-xl" type="button" style="display: none; color: var(--danger); margin-left: auto;">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                    </svg>
-                                    Delete
-                                </button>
-                            </div>
-                            <p class="hint-text">
-                                Low stock products will be highlighted with warning badge.
-                            </p>
                         </div>
+                        
+                        <div class="card-body stack-gap">
+                            <div class="field">
+                                <label class="field-label">Product Name</label>
+                                <input id="product-edit-name" type="text" class="field-input" autocomplete="off">
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Barcode(s) <span style="font-weight: 400; font-size: 12px; color: var(--text-soft);">(Press Space or Comma to add)</span></label>
+                                <div id="barcode-tag-container" class="field-input barcode-tag-container">
+                                    <!-- Barcode tags will be added here dynamically -->
+                                    <input id="product-edit-barcode" type="text" class="barcode-tag-input" autocomplete="off" placeholder="Scan or type barcode...">
+                                </div>
+                                <input id="product-edit-barcode-hidden" type="hidden">
+                            </div>
+                            <div class="two-col">
+                                <div class="field">
+                                    <label class="field-label">SKU <span style="font-weight: 400; font-size: 12px; color: var(--text-soft);">(optional)</span></label>
+                                    <input id="product-edit-sku" type="text" class="field-input" autocomplete="off">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Category</label>
+                                    <input id="product-edit-category" type="text" class="field-input" autocomplete="off" placeholder="e.g., Electronics, Food" list="category-suggestions">
+                                    <datalist id="category-suggestions">
+                                        <!-- Filled by JS -->
+                                    </datalist>
+                                </div>
+                            </div>
+                            <div class="two-col">
+                                <div class="field">
+                                    <label class="field-label">Brand</label>
+                                    <input id="product-edit-brand" type="text" class="field-input" autocomplete="off" placeholder="e.g., Samsung, Nike" list="brand-suggestions">
+                                    <datalist id="brand-suggestions">
+                                        <!-- Filled by JS -->
+                                    </datalist>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Supplier</label>
+                                    <input id="product-edit-supplier" type="text" class="field-input" autocomplete="off" placeholder="e.g., ABC Traders" list="supplier-suggestions">
+                                    <datalist id="supplier-suggestions">
+                                        <!-- Filled by JS -->
+                                    </datalist>
+                                </div>
+                            </div>
+                        </div>  
+                        <div class="two-col">
+                            <div class="field">
+                                <label class="field-label">Buying Price (৳)</label>
+                                <input id="product-edit-buy" type="number" class="field-input" min="0" step="1">
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Selling Price (৳)</label>
+                                <input id="product-edit-sell" type="number" class="field-input" min="0" step="1">
+                            </div>
+                        </div>
+                        <div class="two-col">
+                            <div class="field">
+                                <label class="field-label">Stock</label>
+                                <input id="product-edit-stock" type="number" class="field-input" min="0" step="1">
+                                <p class="hint-text" style="margin-top: 4px; font-size: 12px;">Stock can only be set for new products. For existing products, use stock adjustment below.</p>
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Low stock alert at</label>
+                                <input id="product-edit-low" type="number" class="field-input" min="0" step="1">
+                            </div>
+                        </div>
+                        <div class="input-row">
+                            <button id="btn-save-product" class="btn btn-primary btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-12L10.125 2.25z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 17.25h-9m9-4.5h-9m5.25-9v6.75h-6.75" />
+                                </svg>
+                                Save product
+                            </button>
+                            <button id="btn-new-product" class="btn btn-ghost btn-xl" type="button">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                New
+                            </button>
+                            <button id="btn-delete-product" class="btn btn-ghost btn-xl" type="button" style="display: none; color: var(--danger); margin-left: auto;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                </svg>
+                                Delete
+                            </button>
+                        </div>
+                        <p class="hint-text">
+                            Low stock products will be highlighted with warning badge.
+                        </p>
                     </div>
 
                     <!-- Sales with this Product Card (only visible for existing products) -->
-                    <div id="product-sales-card" class="card" style="display: none;">
+                    <div id="product-sales-card" class="card" style="display: none; margin-top: 16px;">
                         <div class="card-header">
                             <div>
                                 <span class="card-title">Sales with this Product</span>
@@ -953,7 +971,7 @@
                     </div>
 
                     <!-- Stock Adjustment Card (only visible for existing products) -->
-                    <div id="stock-adjustment-card" class="card" style="display: none;">
+                    <div id="stock-adjustment-card" class="card" style="display: none; margin-top: 16px;">
                         <div class="card-header">
                             <div>
                                 <span class="card-title">Stock Adjustment</span>
@@ -990,7 +1008,7 @@
                     </div>
 
                     <!-- Stock Updates Log Card (collapsible) -->
-                    <div id="stock-updates-card" class="card" style="display: none;">
+                    <div id="stock-updates-card" class="card" style="display: none; margin-top: 16px;">
                         <div class="card-header" style="cursor: pointer;" id="stock-updates-header">
                             <div>
                                 <span class="card-title">Stock Update History</span>

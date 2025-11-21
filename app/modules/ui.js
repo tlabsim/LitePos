@@ -44,7 +44,7 @@
             'receipt-print', 'receipt-shop-name', 'receipt-shop-address', 'receipt-shop-phone',
             'receipt-sale-meta', 'receipt-items-body', 'receipt-subtotal', 'receipt-discount', 'receipt-total', 'receipt-payment', 'receipt-change',
             'customer-search', 'customers-table-body', 'customer-edit-name', 'customer-edit-phone', 'customer-edit-address', 'customer-edit-notes', 'btn-save-customer-edit', 'btn-new-customer',
-            'product-manage-search', 'products-table-body', 'product-edit-name', 'product-edit-sku', 'product-edit-barcode', 'product-edit-category', 'product-edit-brand', 'product-edit-supplier', 'product-edit-buy', 'product-edit-sell', 'product-edit-stock', 'product-edit-low', 'btn-save-product', 'btn-new-product', 'btn-delete-product',
+            'product-manage-search', 'products-table-body', 'product-details-column', 'editing-product-header', 'product-edit-name', 'product-edit-sku', 'product-edit-barcode', 'product-edit-category', 'product-edit-brand', 'product-edit-supplier', 'product-edit-buy', 'product-edit-sell', 'product-edit-stock', 'product-edit-low', 'btn-save-product', 'btn-new-product', 'btn-delete-product',
             'product-filter-category', 'product-filter-brand', 'product-filter-supplier', 'product-sort', 'product-page-info', 'btn-product-prev-page', 'btn-product-next-page', 'category-suggestions', 'product-total-count', 'product-filter-low-stock', 'product-count-badge',
             'stock-adjustment-card', 'stock-current-value', 'stock-adjustment-qty', 'stock-adjustment-date', 'stock-adjustment-note', 'btn-save-stock-adjustment',
             'stock-updates-card', 'stock-updates-header', 'btn-toggle-stock-updates', 'stock-updates-body', 'stock-updates-table-body',

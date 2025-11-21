@@ -524,11 +524,11 @@
                     <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px;">
                         <div style="display: flex; justify-content: space-between;"><span>Subtotal:</span><span style="font-family: monospace;">${formatMoney(subtotal)}</span></div>
                         <div style="display: flex; justify-content: space-between;"><span>Discount:</span><span style="font-family: monospace; color: var(--danger);">-${formatMoney(discount)}</span></div>
-                        <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border); font-weight: 600; font-size: 16px;"><span>Total:</span><span style="font-family: monospace;">${formatMoney(total)}</span></div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(120,130,140,0.5); border-bottom: 1px solid rgba(120,130,140,0.5); font-weight: 600; font-size: 16px;"><span>Total:</span><span style="font-family: monospace;">${formatMoney(total)}</span></div>
                         <div style="display: flex; justify-content: space-between; margin-top: 8px;"><span>Payment:</span><span style="font-family: monospace;">${formatMoney(payment)}</span></div>
                         ${change > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Change:</span><span style="font-family: monospace;">${formatMoney(change)}</span></div>` : ''}
                         ${due > 0 ? `<div style="display: flex; justify-content: space-between; color: var(--danger); font-weight: 600;"><span>Due:</span><span style="font-family: monospace;">${formatMoney(due)}</span></div>` : ''}
-                        <div style="display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);"><span>Profit:</span><span style="font-family: monospace; color: ${profit >= 0 ? 'var(--success)' : 'var(--danger)'}; font-weight: 600;">${formatMoney(profit)}</span></div>
+                        <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid rgba(120,130,140,0.5);"><span>Profit:</span><span style="font-family: monospace; color: ${profit >= 0 ? 'var(--success)' : 'var(--danger)'}; font-weight: 600;">${formatMoney(profit)}</span></div>
                     </div>
                 </div>
             </div>
@@ -548,6 +548,7 @@
         if (!tbody) return;
         tbody.innerHTML = '';
 
+        // Get all filter values
         const from = _getEl('sales-filter-from') ? _getEl('sales-filter-from').value : '';
         const to = _getEl('sales-filter-to') ? _getEl('sales-filter-to').value : '';
         const status = _getEl('sales-filter-status') ? _getEl('sales-filter-status').value : 'all';
@@ -555,12 +556,12 @@
         const paymentMethod = _getEl('sales-filter-payment-method') ? _getEl('sales-filter-payment-method').value : 'all';
         const query = (_getEl('sales-filter-query') && _getEl('sales-filter-query').value || '').trim().toLowerCase();
 
-        // Filter and sort sales
+        // Apply all filters in logical order: date → status → salesperson → payment → text search
         const filteredSales = (db.sales || [])
             .slice()
             .filter(sale => {
+                // 1. Date range filter (most common filter)
                 if (from || to) {
-                    // Sale dates are stored in UTC, convert to local timezone for comparison
                     const saleDate = new Date(sale.createdAt || sale.updatedAt || new Date());
                     const localDate = UTILS && typeof UTILS.utcToLocal === 'function' 
                         ? UTILS.utcToLocal(saleDate) 
@@ -575,21 +576,23 @@
                     if (to && dStr > to) return false;
                 }
 
+                // 2. Status filter (open/closed/withdue)
                 if (status === 'withdue') {
-                    // Filter sales with due amount (debt > 0)
                     if (!sale.debt || sale.debt <= 0) return false;
                 } else if (status !== 'all' && sale.status !== status) {
                     return false;
                 }
                 
+                // 3. Salesperson filter
                 if (userId && userId !== 'all' && sale.salespersonId !== userId) return false;
                 
-                // Filter by payment method
+                // 4. Payment method filter
                 if (paymentMethod && paymentMethod !== 'all') {
                     const salePaymentMethod = sale.payment_method || 'cash';
                     if (salePaymentMethod !== paymentMethod) return false;
                 }
 
+                // 5. Text search filter (last, as it's the most expensive)
                 if (query) {
                     const customerName = sale.customer && sale.customer.name ? sale.customer.name : '';
                     const phone = sale.customer && sale.customer.phone ? sale.customer.phone : '';
@@ -603,18 +606,23 @@
 
         if (filteredSales.length === 0) {
             tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;">No Sales Found</td></tr>';
+            
+            // Clear summary when no sales found
+            const summaryContainer = _getEl('sales-global-summary-container');
+            if (summaryContainer) {
+                summaryContainer.innerHTML = '<div class="sales-global-summary"><div class="summary-title">📊 Summary</div><div class="summary-stats"><div class="summary-stat"><div class="stat-value">0</div><div class="stat-label">No sales match filters</div></div></div></div>';
+            }
             return;
         }
 
-        // Group sales by date
+        // Group sales by date for table display
         const groupsByDate = {};
         filteredSales.forEach(sale => {
             const saleDate = new Date(sale.createdAt || sale.updatedAt || new Date());
-            // Convert UTC to local timezone for grouping
             const localDate = UTILS && typeof UTILS.utcToLocal === 'function' 
                 ? UTILS.utcToLocal(saleDate) 
                 : saleDate;
-            const dateKey = localDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format in local timezone
+            const dateKey = localDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
             
             if (!groupsByDate[dateKey]) {
                 groupsByDate[dateKey] = {
@@ -635,20 +643,15 @@
         // Sort date keys descending (newest first)
         const sortedDates = Object.keys(groupsByDate).sort((a, b) => b.localeCompare(a));
 
-        // Calculate global totals
-        let globalCount = 0;
+        // Calculate summary statistics from ALL FILTERED SALES
+        let globalCount = filteredSales.length;
         let globalTotal = 0;
         let globalProfit = 0;
         let globalDue = 0;
-        sortedDates.forEach(dateKey => {
-            const group = groupsByDate[dateKey];
-            globalCount += group.count;
-            globalTotal += group.total;
-            globalProfit += group.profit;
-        });
         
-        // Calculate total due from all filtered sales
         filteredSales.forEach(sale => {
+            globalTotal += (sale.total || 0);
+            globalProfit += computeProfitForSale(sale);
             globalDue += (sale.debt || 0);
         });
 
