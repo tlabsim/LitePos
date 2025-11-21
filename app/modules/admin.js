@@ -257,6 +257,104 @@
         showToast('Settings saved', 'Global settings updated successfully.', 'success');
     }
 
+    function loadPOSSettings() {
+        const state = getState();
+        
+        // Ensure state.db exists
+        if (!state.db) {
+            const raw = localStorage.getItem(KEY);
+            if (raw) {
+                try {
+                    state.db = JSON.parse(raw);
+                } catch (e) {
+                    console.error('Failed to parse db from localStorage', e);
+                    state.db = {};
+                }
+            } else {
+                state.db = {};
+            }
+        }
+        
+        const db = state.db;
+        const settings = db.settings || {};
+        
+        // Get elements directly
+        const enableDueInput = document.getElementById('pos-enable-due');
+        const maxDebtLimitInput = document.getElementById('pos-max-debt-limit');
+        const splitBarcodeEntriesInput = document.getElementById('pos-split-barcode-entries');
+        const animationLevelSelect = document.getElementById('pos-animation-level');
+        
+        if (enableDueInput) {
+            enableDueInput.checked = settings.enableDue !== false; // Default to true
+        }
+        if (maxDebtLimitInput) {
+            maxDebtLimitInput.value = settings.maxDebtLimit || 0;
+        }
+        if (splitBarcodeEntriesInput) {
+            splitBarcodeEntriesInput.checked = settings.splitCartEntriesForDifferentBarcodes || false;
+        }
+        if (animationLevelSelect) {
+            animationLevelSelect.value = settings.animationLevel || 'normal';
+        }
+    }
+
+    function savePOSSettings() {
+        console.log('[admin.js] savePOSSettings called');
+        const state = getState();
+        
+        // Ensure state.db exists and is initialized
+        if (!state.db) {
+            const raw = localStorage.getItem(KEY);
+            if (raw) {
+                try {
+                    state.db = JSON.parse(raw);
+                } catch (e) {
+                    console.error('Failed to parse db from localStorage', e);
+                    state.db = {};
+                }
+            } else {
+                state.db = {};
+            }
+        }
+        
+        const db = state.db;
+        db.settings = db.settings || {};
+        
+        // Get elements directly
+        const enableDueInput = document.getElementById('pos-enable-due');
+        const maxDebtLimitInput = document.getElementById('pos-max-debt-limit');
+        const splitBarcodeEntriesInput = document.getElementById('pos-split-barcode-entries');
+        const animationLevelSelect = document.getElementById('pos-animation-level');
+        
+        db.settings.enableDue = enableDueInput ? enableDueInput.checked : true;
+        db.settings.maxDebtLimit = maxDebtLimitInput ? parseFloat(maxDebtLimitInput.value) || 0 : 0;
+        db.settings.splitCartEntriesForDifferentBarcodes = splitBarcodeEntriesInput ? splitBarcodeEntriesInput.checked : false;
+        db.settings.animationLevel = animationLevelSelect ? animationLevelSelect.value : 'normal';
+        
+        // Apply animation level to CSS variable
+        const animationState = db.settings.animationLevel === 'reduced' ? 'paused' : 'running';
+        document.documentElement.style.setProperty('--bilingual-animation', animationState);
+        
+        console.log('[admin.js] Saving POS settings:', { 
+            enableDue: db.settings.enableDue, 
+            maxDebtLimit: db.settings.maxDebtLimit,
+            splitCartEntriesForDifferentBarcodes: db.settings.splitCartEntriesForDifferentBarcodes,
+            animationLevel: db.settings.animationLevel
+        });
+        
+        // Save to localStorage and state
+        saveDb(db);
+        state.db = db;
+        window.LitePos.state.db = db;
+        
+        // Refresh POS view
+        if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.updateSaleTotals === 'function') {
+            try { window.LitePos.pos.updateSaleTotals(); } catch (e) { console.error(e); }
+        }
+        
+        showToast('Settings saved', 'POS settings updated successfully.', 'success');
+    }
+
     function renderUsersTable() {
         const state = getState();
         const els = getEls();
@@ -510,7 +608,39 @@
     async function handleRestoreFile(ev) {
         const file = ev.target.files && ev.target.files[0];
         if (!file) return;
-        if (!confirm('Restoring backup will replace all local data. Continue?')) { ev.target.value = ''; return; }
+        
+        const modalNotifier = window.LitePos?.ui?.modalNotifier;
+        if (!modalNotifier) {
+            if (!confirm('Restoring backup will replace all local data. Continue?')) { ev.target.value = ''; return; }
+            proceedWithRestore(file, ev);
+            return;
+        }
+        
+        modalNotifier.show({
+            type: 'warning',
+            title: 'Restore Backup',
+            message: 'Restoring backup will replace all local data. Are you sure you want to continue?',
+            actions: [
+                {
+                    label: 'Yes, restore backup',
+                    variant: 'danger',
+                    autofocus: true,
+                    onClick: () => {
+                        proceedWithRestore(file, ev);
+                    }
+                },
+                {
+                    label: 'Cancel',
+                    variant: 'ghost',
+                    onClick: () => {
+                        ev.target.value = '';
+                    }
+                }
+            ]
+        });
+    }
+    
+    async function proceedWithRestore(file, ev) {
         
         const reader = new FileReader();
         reader.onload = async () => {
@@ -571,6 +701,8 @@
     window.LitePos.admin.removeLogo = removeLogo;
     window.LitePos.admin.loadGlobalSettings = loadGlobalSettings;
     window.LitePos.admin.saveGlobalSettings = saveGlobalSettings;
+    window.LitePos.admin.loadPOSSettings = loadPOSSettings;
+    window.LitePos.admin.savePOSSettings = savePOSSettings;
     window.LitePos.admin.renderUsersTable = renderUsersTable;
     window.LitePos.admin.loadUserToForm = loadUserToForm;
     window.LitePos.admin.clearUserForm = clearUserForm;

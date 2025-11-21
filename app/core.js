@@ -92,6 +92,10 @@
             if (elements.actions) {
                 elements.actions.innerHTML = '';
             }
+            // Clear message content to prevent carryover
+            if (elements.message) {
+                elements.message.innerHTML = '';
+            }
             if (previousFocus && typeof previousFocus.focus === 'function') {
                 previousFocus.focus();
             }
@@ -101,13 +105,32 @@
 
         function show(options = {}) {
             ensure();
+            
+            // Close any existing modal first
+            if (!elements.overlay.classList.contains('hidden')) {
+                close();
+                // Allow a brief moment for the close animation
+                setTimeout(() => showInternal(options), 50);
+                return;
+            }
+            
+            showInternal(options);
+        }
+        
+        function showInternal(options = {}) {
             currentOptions = options;
             previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
             const type = options.type || 'info';
             elements.card.setAttribute('data-type', type);
             elements.title.textContent = options.title || 'Notice';
-            elements.message.textContent = options.message || '';
+            
+            // Support both text and HTML messages
+            if (options.messageHtml) {
+                elements.message.innerHTML = options.messageHtml;
+            } else {
+                elements.message.textContent = options.message || '';
+            }
 
             const actions = Array.isArray(options.actions) && options.actions.length
                 ? options.actions
@@ -155,6 +178,157 @@
         };
     })();
 
+    const modalWindow = (() => {
+        const elements = {
+            overlay: null,
+            window: null,
+            header: null,
+            title: null,
+            closeBtn: null,
+            body: null,
+            footer: null
+        };
+        let previousFocus = null;
+        let currentOptions = null;
+
+        function ensure() {
+            if (elements.overlay) return;
+            const overlay = document.createElement('div');
+            overlay.id = 'modal-window';
+            overlay.className = 'modal-overlay hidden';
+            overlay.setAttribute('aria-hidden', 'true');
+            overlay.innerHTML = `
+                <div class="modal-window" role="dialog" aria-modal="true">
+                    <div class="modal-window-header">
+                        <h3 class="modal-window-title">Window</h3>
+                        <button type="button" class="modal-window-close" aria-label="Close">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 20px; height: 20px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="modal-window-body"></div>
+                    <div class="modal-window-footer"></div>
+                </div>`;
+            document.body.appendChild(overlay);
+
+            elements.overlay = overlay;
+            elements.window = overlay.querySelector('.modal-window');
+            elements.header = overlay.querySelector('.modal-window-header');
+            elements.title = overlay.querySelector('.modal-window-title');
+            elements.closeBtn = overlay.querySelector('.modal-window-close');
+            elements.body = overlay.querySelector('.modal-window-body');
+            elements.footer = overlay.querySelector('.modal-window-footer');
+
+            elements.closeBtn.addEventListener('click', close);
+
+            overlay.addEventListener('click', evt => {
+                if (evt.target === overlay && (!currentOptions || currentOptions.dismissable !== false)) {
+                    close();
+                }
+            });
+
+            window.addEventListener('keydown', evt => {
+                if (evt.key === 'Escape' && elements.overlay && !elements.overlay.classList.contains('hidden')) {
+                    if (!currentOptions || currentOptions.dismissable !== false) {
+                        close();
+                    }
+                }
+            });
+        }
+
+        function close() {
+            if (!elements.overlay) return;
+            elements.overlay.classList.add('hidden');
+            elements.overlay.setAttribute('aria-hidden', 'true');
+            if (elements.body) {
+                elements.body.innerHTML = '';
+            }
+            if (elements.footer) {
+                elements.footer.innerHTML = '';
+            }
+            if (previousFocus && typeof previousFocus.focus === 'function') {
+                previousFocus.focus();
+            }
+            previousFocus = null;
+            currentOptions = null;
+        }
+
+        function show(options = {}) {
+            ensure();
+            
+            // Close any existing window first
+            if (!elements.overlay.classList.contains('hidden')) {
+                close();
+                setTimeout(() => showInternal(options), 50);
+                return;
+            }
+            
+            showInternal(options);
+        }
+        
+        function showInternal(options = {}) {
+            currentOptions = options;
+            previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+            elements.title.textContent = options.title || 'Window';
+            
+            // Set body content (HTML or text)
+            if (options.bodyHtml) {
+                elements.body.innerHTML = options.bodyHtml;
+            } else if (options.body) {
+                elements.body.textContent = options.body;
+            }
+
+            // Set footer actions
+            elements.footer.innerHTML = '';
+            if (options.actions && Array.isArray(options.actions) && options.actions.length > 0) {
+                elements.footer.style.display = 'flex';
+                const hasAutofocus = options.actions.some(action => action.autofocus);
+                let focusTarget = null;
+                
+                options.actions.forEach((action, index) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = `btn btn-${action.variant || 'primary'}`;
+                    btn.textContent = action.label || 'OK';
+                    if (action.title) {
+                        btn.title = action.title;
+                    }
+                    btn.addEventListener('click', () => {
+                        if (typeof action.onClick === 'function') {
+                            action.onClick();
+                        }
+                        if (action.closes !== false) {
+                            close();
+                        }
+                    });
+                    elements.footer.appendChild(btn);
+                    
+                    const shouldFocus = !focusTarget && ((hasAutofocus && action.autofocus) || (!hasAutofocus && index === 0));
+                    if (shouldFocus) {
+                        focusTarget = btn;
+                    }
+                });
+                
+                if (focusTarget) {
+                    requestAnimationFrame(() => focusTarget.focus());
+                }
+            } else {
+                elements.footer.style.display = 'none';
+            }
+
+            elements.overlay.classList.remove('hidden');
+            elements.overlay.setAttribute('aria-hidden', 'false');
+        }
+
+        return {
+            init: ensure,
+            show,
+            close
+        };
+    })();
+
     // -------------------------
     // INIT
     // -------------------------
@@ -164,9 +338,11 @@
         const ns = window.LitePos || {};
         ns.ui = ns.ui || {};
         ns.ui.modalNotifier = modalNotifier;
+        ns.ui.modalWindow = modalWindow;
         window.LitePos = ns;
 
         modalNotifier.init();
+        modalWindow.init();
 
         // Elements: prefer ns.ui.cacheElements to populate ns.elements, but keep local cacheElements fallback
         if (ns.ui && typeof ns.ui.cacheElements === 'function') {
@@ -555,6 +731,7 @@
             // Sales tab
             'sales-filter-from', 'sales-filter-to',
             'sales-filter-status', 'sales-filter-user',
+            'sales-filter-payment-method',
             'sales-filter-query', 'btn-sales-clear-filters',
             'sales-table-body',
 
@@ -644,6 +821,12 @@
         
         // Hide splash screen after showing main screen
         hideSplashScreen();
+        
+        // Apply animation level setting from settings
+        const settings = db?.settings || {};
+        const animationLevel = settings.animationLevel || 'normal';
+        const animationState = animationLevel === 'reduced' ? 'paused' : 'running';
+        document.documentElement.style.setProperty('--bilingual-animation', animationState);
         
         // Restore last active tab or default to sale tab
         let savedTab = 'tab-sale';
@@ -972,6 +1155,179 @@
         if (getElement('btn-cancel-sale')) {
             getElement('btn-cancel-sale').addEventListener('click', cancelCurrentSale);
         }
+        if (getElement('btn-cancel-edit-sale')) {
+            getElement('btn-cancel-edit-sale').addEventListener('click', () => {
+                modalNotifier.show({
+                    type: 'warning',
+                    title: 'Cancel Sale Update',
+                    message: 'Are you sure you want to cancel editing this sale? All changes will be discarded and you will start a fresh new sale.',
+                    actions: [
+                        {
+                            label: 'Yes, cancel and start new',
+                            variant: 'danger',
+                            autofocus: true,
+                            onClick: () => {
+                                console.log('=== Cancel Sale Update confirmed ===');
+                                
+                                // Clear auto-save FIRST
+                                if (window.LitePos?.pos?.clearAutoSave) {
+                                    console.log('Clearing auto-save...');
+                                    window.LitePos.pos.clearAutoSave();
+                                }
+                                
+                                // Clear customer
+                                console.log('Clearing customer...');
+                                setCurrentCustomer(null);
+                                
+                                // Start completely fresh sale (notify=true to skip auto-save check)
+                                // This handles cart clearing, UI updates, and button visibility
+                                console.log('Calling startNewSale(true)...');
+                                startNewSale(true);
+                                
+                                // DON'T call renderCartTable() - startNewSale already clears the cart
+                                // Calling it here causes state sync issues and cart items reappear
+                                
+                                console.log('=== Cancel Sale Update complete ===');
+                                showToast('Sale cancelled', 'Started a fresh new sale.', 'success');
+                            }
+                        },
+                        {
+                            label: 'Keep editing',
+                            variant: 'ghost'
+                        }
+                    ]
+                });
+            });
+        }
+        if (getElement('btn-revert-changes')) {
+            getElement('btn-revert-changes').addEventListener('click', () => {
+                console.log('Revert Changes clicked', currentSale);
+                if (!currentSale || !currentSale.id) {
+                    console.log('No current sale or sale ID');
+                    return;
+                }
+                
+                const saleId = currentSale.id;
+                const originalSale = db.sales.find(s => s.id === saleId);
+                console.log('Original sale:', originalSale);
+                
+                if (!originalSale) {
+                    showToast('Error', 'Original sale not found.', 'error');
+                    return;
+                }
+                
+                modalNotifier.show({
+                    type: 'warning',
+                    title: 'Revert Changes',
+                    message: 'Are you sure you want to revert all changes and reload the original sale? All modifications will be lost.',
+                    actions: [
+                        {
+                            label: 'Yes, revert changes',
+                            variant: 'danger',
+                            autofocus: true,
+                            onClick: () => {
+                                console.log('User confirmed revert');
+                                // Clear auto-save to prevent interference
+                                if (window.LitePos?.pos?.clearAutoSave) {
+                                    window.LitePos.pos.clearAutoSave();
+                                }
+                                
+                                // Deep clone the original sale
+                                currentSale = structuredCloneSale(originalSale);
+                                if (window.LitePos && window.LitePos.state) {
+                                    window.LitePos.state.currentSale = currentSale;
+                                }
+                                
+                                // Restore customer UI
+                                setCurrentCustomer(currentSale.customer || null);
+                                const customerPhoneInput = getElement('customer-phone-input');
+                                const customerNameDisplay = getElement('customer-name-display');
+                                if (customerPhoneInput) {
+                                    customerPhoneInput.value = currentSale.customer?.phone || '';
+                                    customerPhoneInput.disabled = !!(currentSale.customer && currentSale.customer.phone);
+                                    customerPhoneInput.title = currentSale.customer ? 'Cannot change customer for existing sales' : '';
+                                }
+                                if (customerNameDisplay) {
+                                    customerNameDisplay.textContent = currentSale.customer?.name || 'Walk-in';
+                                }
+                                const customerSearchBtn = getElement('btn-customer-search');
+                                if (customerSearchBtn) {
+                                    customerSearchBtn.disabled = !!(currentSale.customer && currentSale.customer.phone);
+                                    customerSearchBtn.title = currentSale.customer ? 'Cannot change customer for existing sales' : '';
+                                }
+                                
+                                // Restore payment method
+                                const paymentMethodPills = document.querySelectorAll('.payment-method-pill');
+                                paymentMethodPills.forEach(pill => {
+                                    if (pill.dataset.method === (currentSale.payment_method || 'cash')) {
+                                        pill.classList.add('active');
+                                    } else {
+                                        pill.classList.remove('active');
+                                    }
+                                });
+                                
+                                // Restore payment details
+                                const paymentDetailsRow = getElement('payment-details-row');
+                                const paymentDetailsInput = getElement('input-payment-details');
+                                if (currentSale.payment_method && currentSale.payment_method !== 'cash') {
+                                    if (paymentDetailsRow) paymentDetailsRow.classList.remove('hidden');
+                                    if (paymentDetailsInput) {
+                                        paymentDetailsInput.value = currentSale.payment_details || '';
+                                        switch(currentSale.payment_method) {
+                                            case 'card':
+                                                paymentDetailsInput.placeholder = 'Card number (last 4 digits)';
+                                                break;
+                                            case 'bkash':
+                                                paymentDetailsInput.placeholder = 'bKash number';
+                                                break;
+                                            case 'nagad':
+                                                paymentDetailsInput.placeholder = 'Nagad number';
+                                                break;
+                                        }
+                                    }
+                                } else {
+                                    if (paymentDetailsRow) paymentDetailsRow.classList.add('hidden');
+                                    if (paymentDetailsInput) paymentDetailsInput.value = '';
+                                }
+                                
+                                // Restore payment input
+                                const paymentInput = getElement('input-payment');
+                                if (paymentInput && currentSale.payment) {
+                                    paymentInput.value = currentSale.payment || 0;
+                                }
+                                
+                                // Update cart title
+                                const cartTitle = document.getElementById('cart-title');
+                                const cartSubheaderBn = document.getElementById('cart-subheader-bn');
+                                const saleStatus = currentSale.status || 'open';
+                                if (cartTitle) {
+                                    cartTitle.textContent = saleStatus === 'closed' ? 'Editing Closed Sale' : 'Editing Sale';
+                                }
+                                if (cartSubheaderBn) {
+                                    cartSubheaderBn.textContent = '· বিক্রয় সম্পাদনা';
+                                }
+                                
+                                // Force complete UI refresh
+                                console.log('Calling renderCartTable to restore cart...');
+                                renderCartTable();
+                                if (window.LitePos?.pos?.updateSaleTotals) {
+                                    window.LitePos.pos.updateSaleTotals();
+                                }
+                                if (window.LitePos?.pos?.updateActionButtonsVisibility) {
+                                    window.LitePos.pos.updateActionButtonsVisibility();
+                                }
+                                
+                                showToast('Changes reverted', 'Original sale reloaded.', 'success');
+                            }
+                        },
+                        {
+                            label: 'Keep editing',
+                            variant: 'ghost'
+                        }
+                    ]
+                });
+            });
+        }
         if (getElement('btn-clear-cart')) {
             getElement('btn-clear-cart').addEventListener('click', clearCart);
         }
@@ -1078,6 +1434,14 @@
         if (getElement('btn-delete-product')) {
             getElement('btn-delete-product').addEventListener('click', deleteProduct);
         }
+        if (getElement('btn-view-product-sales')) {
+            getElement('btn-view-product-sales').addEventListener('click', () => {
+                const productId = getElement('product-edit-name')?.dataset?.productId;
+                if (productId && window.LitePos?.products?.viewProductSales) {
+                    window.LitePos.products.viewProductSales(productId);
+                }
+            });
+        }
         if (getElement('btn-save-stock-adjustment')) {
             getElement('btn-save-stock-adjustment').addEventListener('click', saveStockAdjustment);
         }
@@ -1110,11 +1474,15 @@
         }
 
         // Sales tab
-        ['sales-filter-from', 'sales-filter-to', 'sales-filter-status', 'sales-filter-user', 'sales-filter-query']
+        ['sales-filter-from', 'sales-filter-to', 'sales-filter-status', 'sales-filter-user', 'sales-filter-query', 'sales-filter-payment-method']
             .forEach(id => {
-                if (els[id]) {
-                    els[id].addEventListener('input', renderSalesTable);
-                    els[id].addEventListener('change', renderSalesTable);
+                const el = els[id] || document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', renderSalesTable);
+                    el.addEventListener('change', renderSalesTable);
+                    console.log('Sales filter event listener attached for:', id);
+                } else {
+                    console.warn('Sales filter element not found:', id);
                 }
             });
         if (getElement('btn-sales-clear-filters')) {
@@ -1143,6 +1511,11 @@
         // Admin: global settings
         if (getElement('btn-save-global-settings')) {
             getElement('btn-save-global-settings').addEventListener('click', saveGlobalSettings);
+        }
+
+        // Admin: POS settings
+        if (getElement('btn-save-pos-settings')) {
+            getElement('btn-save-pos-settings').addEventListener('click', savePOSSettings);
         }
 
         // Admin: users
@@ -1315,6 +1688,7 @@
                 break;
             case 'tab-sales':
                 prepareSalesFiltersIfEmpty();
+                populateSalespersonFilter();
                 renderSalesTable();
                 break;
             case 'tab-reports':
@@ -1324,6 +1698,7 @@
             case 'tab-admin':
                 loadShopForm();
                 loadGlobalSettings();
+                loadPOSSettings();
                 renderUsersTable();
                 populateSalespersonFilter();
                 break;
@@ -1425,10 +1800,15 @@
     }
 
     function startNewSale(notify) {
+        console.log('[startNewSale wrapper] Called with notify:', notify);
+        console.log('[startNewSale wrapper] Before - currentSale.items:', currentSale?.items?.length || 0);
         if (window.LitePos?.pos?.startNewSale) {
             window.LitePos.pos.startNewSale(notify);
             if (window.LitePos.state?.currentSale) {
+                console.log('[startNewSale wrapper] Syncing currentSale from state.currentSale');
+                console.log('[startNewSale wrapper] state.currentSale.items:', window.LitePos.state.currentSale.items.length);
                 currentSale = window.LitePos.state.currentSale;
+                console.log('[startNewSale wrapper] After sync - currentSale.items:', currentSale.items.length);
             }
             return;
         }
@@ -1512,10 +1892,20 @@
     window.LitePos.ui.syncCartUiState = syncCartUiState;
 
     function renderCartTable() {
+        console.log('[renderCartTable wrapper] Called');
+        console.log('[renderCartTable wrapper] Before sync - currentSale.items:', currentSale?.items?.length || 0);
         if (window.LitePos?.pos?.renderCartTable) {
-            if (window.LitePos.state) window.LitePos.state.currentSale = currentSale;
+            if (window.LitePos.state) {
+                console.log('[renderCartTable wrapper] Syncing state.currentSale FROM currentSale');
+                window.LitePos.state.currentSale = currentSale;
+            }
             window.LitePos.pos.renderCartTable();
-            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
+            if (window.LitePos.state?.currentSale) {
+                console.log('[renderCartTable wrapper] Syncing currentSale FROM state.currentSale');
+                console.log('[renderCartTable wrapper] state.currentSale.items:', window.LitePos.state.currentSale.items.length);
+                currentSale = window.LitePos.state.currentSale;
+                console.log('[renderCartTable wrapper] After sync - currentSale.items:', currentSale.items.length);
+            }
             return;
         }
         console.error('renderCartTable: pos module not loaded');
@@ -1783,14 +2173,40 @@
             return showToast('Error', 'Open sale not found.', 'error');
         }
         
-        if (!confirm(`Cancel open sale ${saleId}? This cannot be undone.`)) {
+        const modalNotifier = window.LitePos?.ui?.modalNotifier;
+        if (!modalNotifier) {
+            if (!confirm(`Cancel open sale ${saleId}? This cannot be undone.`)) {
+                return;
+            }
+            db.sales.splice(idx, 1);
+            saveDb();
+            renderOpenSalesStrip();
+            showToast('Sale cancelled', `Sale ${saleId} removed.`, 'success');
             return;
         }
         
-        db.sales.splice(idx, 1);
-        saveDb();
-        renderOpenSalesStrip();
-        showToast('Sale cancelled', `Sale ${saleId} removed.`, 'success');
+        modalNotifier.show({
+            type: 'warning',
+            title: 'Cancel Open Sale',
+            message: `Are you sure you want to cancel sale ${saleId}? This action cannot be undone.`,
+            actions: [
+                {
+                    label: 'Yes, cancel sale',
+                    variant: 'danger',
+                    autofocus: true,
+                    onClick: () => {
+                        db.sales.splice(idx, 1);
+                        saveDb();
+                        renderOpenSalesStrip();
+                        showToast('Sale cancelled', `Sale ${saleId} removed.`, 'success');
+                    }
+                },
+                {
+                    label: 'Keep sale',
+                    variant: 'ghost'
+                }
+            ]
+        });
     }
 
     function loadOpenSale(saleId) {
@@ -1821,10 +2237,36 @@
         }
 
         if (activeHasItems && activeSaleId && activeSaleId !== saleId) {
-            if (!confirm(`Save current sale ${activeSaleId} before editing ${saleId}?`)) {
+            const modalNotifier = window.LitePos?.ui?.modalNotifier;
+            if (!modalNotifier) {
+                if (!confirm(`Save current sale ${activeSaleId} before editing ${saleId}?`)) {
+                    return;
+                }
+                persistSaleAsOpen(currentSale);
+            } else {
+                modalNotifier.show({
+                    type: 'info',
+                    title: 'Save Current Sale',
+                    message: `Save current sale ${activeSaleId} before editing sale ${saleId}?`,
+                    actions: [
+                        {
+                            label: 'Yes, save & continue',
+                            variant: 'primary',
+                            autofocus: true,
+                            onClick: () => {
+                                persistSaleAsOpen(currentSale);
+                                // Continue with the edit after save
+                                setTimeout(() => loadSaleForEditing(saleId), 100);
+                            }
+                        },
+                        {
+                            label: 'Cancel',
+                            variant: 'ghost'
+                        }
+                    ]
+                });
                 return;
             }
-            persistSaleAsOpen(currentSale);
         }
 
         currentSale = structuredCloneSale(sale);
@@ -1832,8 +2274,76 @@
             window.LitePos.state.currentSale = currentSale;
         }
         setCurrentCustomer(currentSale.customer || null);
+        
+        // Load payment method and details into UI
+        const paymentMethodPills = document.querySelectorAll('.payment-method-pill');
+        if (paymentMethodPills) {
+            paymentMethodPills.forEach(pill => {
+                if (pill.dataset.method === (currentSale.payment_method || 'cash')) {
+                    pill.classList.add('active');
+                } else {
+                    pill.classList.remove('active');
+                }
+            });
+        }
+        
+        // Show payment details field if method is not cash
+        const paymentDetailsRow = document.getElementById('payment-details-row');
+        const paymentDetailsInput = document.getElementById('input-payment-details');
+        if (paymentDetailsRow && paymentDetailsInput) {
+            if (currentSale.payment_method && currentSale.payment_method !== 'cash') {
+                paymentDetailsRow.classList.remove('hidden');
+                paymentDetailsInput.value = currentSale.payment_details || '';
+                // Set placeholder based on method
+                switch(currentSale.payment_method) {
+                    case 'card':
+                        paymentDetailsInput.placeholder = 'Card number (last 4 digits)';
+                        break;
+                    case 'bkash':
+                        paymentDetailsInput.placeholder = 'bKash number';
+                        break;
+                    case 'nagad':
+                        paymentDetailsInput.placeholder = 'Nagad number';
+                        break;
+                }
+            } else {
+                paymentDetailsRow.classList.add('hidden');
+                paymentDetailsInput.value = '';
+            }
+        }
+        
+        // Disable customer change if sale has a customer
+        const customerPhoneInput = document.getElementById('customer-phone-input');
+        const customerSearchBtn = document.getElementById('btn-customer-search');
+        if (currentSale.customer && currentSale.customer.phone) {
+            if (customerPhoneInput) {
+                customerPhoneInput.disabled = true;
+                customerPhoneInput.title = 'Cannot change customer for existing sales';
+            }
+            if (customerSearchBtn) {
+                customerSearchBtn.disabled = true;
+                customerSearchBtn.title = 'Cannot change customer for existing sales';
+            }
+        } else {
+            if (customerPhoneInput) {
+                customerPhoneInput.disabled = false;
+                customerPhoneInput.title = '';
+            }
+            if (customerSearchBtn) {
+                customerSearchBtn.disabled = false;
+                customerSearchBtn.title = '';
+            }
+        }
+        
         renderCartTable();
         updateSaleTotals();
+        
+        // Update cart title to show "Editing Sale"
+        const cartTitleEl = document.getElementById('cart-title-text');
+        if (cartTitleEl) {
+            const statusLabel = sale.status === 'closed' ? 'Editing Closed Sale' : 'Editing Sale';
+            cartTitleEl.textContent = statusLabel;
+        }
         
         const statusLabel = sale.status === 'closed' ? 'Editing Closed Sale' : (sale.status === 'open' ? 'Editing Open Sale' : 'Editing Sale');
         getElement('summary-sale-status').textContent = `${statusLabel} · ${sale.id}`;
@@ -1872,20 +2382,28 @@
                 return;
             } catch (e) { console.error(e); }
         }
-        if (!lastClosedSaleId) {
-            const latest = db.sales.filter(s => s.status === 'closed').slice(-1)[0];
-            if (!latest) {
-                return showToast('Print', 'No closed sale to print.', 'error');
+        
+        // If editing a sale, print the current sale
+        const isEditing = currentSale && currentSale.id && db.sales.some(s => s.id === currentSale.id);
+        if (isEditing) {
+            fillReceiptFromSale(currentSale);
+        } else {
+            // Print last closed sale
+            if (!lastClosedSaleId) {
+                const latest = db.sales.filter(s => s.status === 'closed').slice(-1)[0];
+                if (!latest) {
+                    return showToast('Print', 'No closed sale to print.', 'error');
+                }
+                lastClosedSaleId = latest.id;
             }
-            lastClosedSaleId = latest.id;
-        }
 
-        const sale = db.sales.find(s => s.id === lastClosedSaleId);
-        if (!sale) {
-            return showToast('Print', 'Last sale not found.', 'error');
-        }
+            const sale = db.sales.find(s => s.id === lastClosedSaleId);
+            if (!sale) {
+                return showToast('Print', 'Last sale not found.', 'error');
+            }
 
-        fillReceiptFromSale(sale);
+            fillReceiptFromSale(sale);
+        }
 
         const size = getElement('receipt-size').value || 'a4';
         document.body.classList.add('print-receipt');
@@ -1996,27 +2514,62 @@
         }
         
         // Ask for confirmation
-        const confirmed = confirm(`Are you sure you want to delete "${product.name}" (SKU: ${product.sku})?\n\nThis action cannot be undone.`);
-        if (!confirmed) {
+        const modalNotifier = window.LitePos?.ui?.modalNotifier;
+        if (!modalNotifier) {
+            const confirmed = confirm(`Are you sure you want to delete "${product.name}" (SKU: ${product.sku})?\n\nThis action cannot be undone.`);
+            if (!confirmed) {
+                return;
+            }
+            
+            const index = db.products.findIndex(p => p.id === productId);
+            if (index !== -1) {
+                db.products.splice(index, 1);
+            }
+            
+            if (db.stock_updates) {
+                db.stock_updates = db.stock_updates.filter(u => u.productId !== productId);
+            }
+            
+            saveDb();
+            renderProductsTable();
+            renderProductSearchTable();
+            clearProductForm();
+            showToast('Product Deleted', `${product.name} has been removed.`, 'success');
             return;
         }
         
-        // Remove product from database
-        const index = db.products.findIndex(p => p.id === productId);
-        if (index !== -1) {
-            db.products.splice(index, 1);
-        }
-        
-        // Remove associated stock updates
-        if (db.stock_updates) {
-            db.stock_updates = db.stock_updates.filter(u => u.productId !== productId);
-        }
-        
-        saveDb();
-        renderProductsTable();
-        renderProductSearchTable();
-        clearProductForm();
-        showToast('Product Deleted', `${product.name} has been removed.`, 'success');
+        modalNotifier.show({
+            type: 'danger',
+            title: 'Delete Product',
+            message: `Are you sure you want to delete "${product.name}" (SKU: ${product.sku})?\n\nThis action cannot be undone.`,
+            actions: [
+                {
+                    label: 'Yes, delete product',
+                    variant: 'danger',
+                    autofocus: true,
+                    onClick: () => {
+                        const index = db.products.findIndex(p => p.id === productId);
+                        if (index !== -1) {
+                            db.products.splice(index, 1);
+                        }
+                        
+                        if (db.stock_updates) {
+                            db.stock_updates = db.stock_updates.filter(u => u.productId !== productId);
+                        }
+                        
+                        saveDb();
+                        renderProductsTable();
+                        renderProductSearchTable();
+                        clearProductForm();
+                        showToast('Product Deleted', `${product.name} has been removed.`, 'success');
+                    }
+                },
+                {
+                    label: 'Cancel',
+                    variant: 'ghost'
+                }
+            ]
+        });
     }
 
     function saveProductFromForm() {
@@ -2291,11 +2844,25 @@
         console.error('loadGlobalSettings: admin module not loaded');
     }
 
+    function loadPOSSettings() {
+        if (window.LitePos?.admin?.loadPOSSettings) {
+            return window.LitePos.admin.loadPOSSettings();
+        }
+        console.error('loadPOSSettings: admin module not loaded');
+    }
+
     function saveGlobalSettings() {
         if (window.LitePos?.admin?.saveGlobalSettings) {
             return window.LitePos.admin.saveGlobalSettings();
         }
         console.error('saveGlobalSettings: admin module not loaded');
+    }
+
+    function savePOSSettings() {
+        if (window.LitePos?.admin?.savePOSSettings) {
+            return window.LitePos.admin.savePOSSettings();
+        }
+        console.error('savePOSSettings: admin module not loaded');
     }
 
     // -------------------------

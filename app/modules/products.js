@@ -39,19 +39,19 @@
         return id;
     }
 
-    function _addToCart(sku) {
+    function _addToCart(productId, matchedBarcode, productSku) {
         if (window.LitePos && window.LitePos.pos && typeof window.LitePos.pos.addProductToCart === 'function') {
-            try { return window.LitePos.pos.addProductToCart(sku); } catch (e) { console.error(e); }
+            try { return window.LitePos.pos.addProductToCart(productId, matchedBarcode, productSku); } catch (e) { console.error(e); }
         }
         if (typeof window.addProductToCart === 'function') {
-            try { return window.addProductToCart(sku); } catch (e) { console.error(e); }
+            try { return window.addProductToCart(productId, matchedBarcode, productSku); } catch (e) { console.error(e); }
         }
-        console.warn('add to cart not available for SKU', sku);
+        console.warn('add to cart not available for product ID', productId);
     }
 
     // After adding to cart from overlay, close overlay unless "all products" toggle is active
-    function _addToCartAndMaybeClose(sku) {
-        _addToCart(sku);
+    function _addToCartAndMaybeClose(productId, matchedBarcode, productSku) {
+        _addToCart(productId, matchedBarcode, productSku);
         const els = _getEls();
         const overlay = _getById('product-overlay');
         const toggle = _getEl('toggle-all-products');
@@ -181,6 +181,7 @@
         filtered.forEach(p => {
             const tr = document.createElement('tr');
             if (p.stock <= (p.lowStockAt || 0)) tr.classList.add('low-stock-row');
+            tr.dataset.productId = p.id;
             tr.addEventListener('click', () => loadProductToForm(p.id));
 
             const tdId = document.createElement('td'); 
@@ -240,6 +241,15 @@
 
             tbody.appendChild(tr);
         });
+        
+        // Re-apply selection highlight if a product was selected
+        if (window.LitePos && window.LitePos.state && window.LitePos.state.selectedProductId) {
+            const selectedProductId = window.LitePos.state.selectedProductId;
+            const currentRow = document.querySelector(`tr[data-product-id="${selectedProductId}"]`);
+            if (currentRow) {
+                currentRow.classList.add('selected-product-row');
+            }
+        }
         
         // Update dropdowns and datalists
         updateCategoryDropdown();
@@ -437,12 +447,16 @@
 
         filtered.forEach((p, idx) => {
             const tr = document.createElement('tr');
-            tr.dataset.sku = p.sku;
+            tr.dataset.productId = p.id;
+            tr.dataset.sku = p.sku || '';
             tr.dataset.index = idx;
-            tr.addEventListener('click', () => _addToCartAndMaybeClose(p.sku));
+            const matchedBarcode = query && p.barcode && p.barcode.split(',').map(b => b.trim()).find(b => b.toLowerCase().includes(query));
+            console.log('Matched barcode for product', p.id, ':', matchedBarcode);
+            // Pass productId, matchedBarcode (if found), and product SKU separately
+            tr.addEventListener('click', () => _addToCartAndMaybeClose(p.id, matchedBarcode, p.sku));
 
             const tdName = document.createElement('td'); tdName.textContent = p.name; tr.appendChild(tdName);
-            const tdSku = document.createElement('td'); tdSku.textContent = p.sku; tr.appendChild(tdSku);
+            const tdSku = document.createElement('td'); tdSku.textContent = p.sku || '—'; tr.appendChild(tdSku);
             const tdBarcode = document.createElement('td'); 
             tdBarcode.className = 'barcode-cell';
             tdBarcode.textContent = p.barcode || '—'; 
@@ -456,7 +470,8 @@
 
             const tdBtn = document.createElement('td');
             const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn btn-primary btn-lg'; btn.textContent = 'Add';
-            btn.addEventListener('click', ev => { ev.stopPropagation(); _addToCartAndMaybeClose(p.sku); });
+            // When clicking Add button directly, no matched barcode - pass null for barcode, p.sku for sku
+            btn.addEventListener('click', ev => { ev.stopPropagation(); _addToCartAndMaybeClose(p.id, null, p.sku); });
             tdBtn.appendChild(btn); tr.appendChild(tdBtn);
 
             tbody.appendChild(tr);
@@ -493,10 +508,17 @@
                         ev.preventDefault();
                         const selected = overlayBody.querySelector('tr.selected');
                         if (selected) {
-                            _addToCartAndMaybeClose(selected.dataset.sku);
+                            const productId = selected.dataset.productId;
+                            const sku = selected.dataset.sku || null;
+                            // For keyboard navigation, check if barcode was matched in the search
+                            const matchedBarcode = query && selected.textContent.includes(query) ? query : null;
+                            _addToCartAndMaybeClose(productId, matchedBarcode, sku);
                         } else if (rows.length === 1) {
                             // If only one result, add it
-                            _addToCartAndMaybeClose(rows[0].dataset.sku);
+                            const productId = rows[0].dataset.productId;
+                            const sku = rows[0].dataset.sku || null;
+                            const matchedBarcode = query && rows[0].textContent.includes(query) ? query : null;
+                            _addToCartAndMaybeClose(productId, matchedBarcode, sku);
                         }
                         return;
                     }
@@ -546,6 +568,32 @@
         const db = _getDb();
         const p = db.products.find(pp => pp.id === id);
         if (!p) return;
+        
+        // Initialize state object if needed
+        if (!window.LitePos.state) window.LitePos.state = {};
+        
+        // Store selected product ID in state for persistence across renders
+        window.LitePos.state.selectedProductId = id;
+        
+        // Remove previous selection highlight
+        const previousSelected = document.querySelector('tr.selected-product-row');
+        if (previousSelected) {
+            previousSelected.classList.remove('selected-product-row');
+        }
+        
+        // Highlight current selected product row
+        // Use setTimeout to ensure DOM is fully rendered
+        setTimeout(() => {
+            const currentRow = document.querySelector(`tr[data-product-id="${id}"]`);
+            if (currentRow) {
+                console.log('Highlighting selected product row for ID:', id, currentRow);
+                console.log('Adding class to element:', currentRow.outerHTML.substring(0, 100));
+                currentRow.classList.add('selected-product-row');
+                console.log('Class added. Classes now:', currentRow.className);
+            } else {
+                console.warn('Could not find row element for product ID:', id);
+            }
+        }, 0);
         if (_getEl('product-edit-name')) _getEl('product-edit-name').value = p.name;
         if (_getEl('product-edit-sku')) _getEl('product-edit-sku').value = p.sku || '';
         
@@ -595,14 +643,168 @@
             }
         }
         
+        // Show product sales card and load stats
+        if (_getEl('product-sales-card')) {
+            _getEl('product-sales-card').style.display = 'block';
+            if (_getEl('product-sales-name')) {
+                _getEl('product-sales-name').textContent = p.name;
+            }
+            loadProductSalesStats(id);
+        }
+        
         // Show delete button for existing products
         if (_getEl('btn-delete-product')) {
             _getEl('btn-delete-product').style.display = 'inline-block';
         }
     }
+    
+    function loadProductSalesStats(productId) {
+        const db = _getDb();
+        const product = db.products.find(p => p.id === productId);
+        if (!product) return;
+        
+        // Find all sales containing this product
+        let salesCount = 0;
+        let totalQty = 0;
+        let totalRevenue = 0;
+        
+        (db.sales || []).forEach(sale => {
+            (sale.items || []).forEach(item => {
+                // Match by product ID or SKU
+                if (item.productId === productId || (product.sku && item.sku === product.sku)) {
+                    salesCount++;
+                    totalQty += item.qty || 0;
+                    totalRevenue += (item.price || 0) * (item.qty || 0);
+                }
+            });
+        });
+        
+        if (_getEl('product-sales-count')) {
+            _getEl('product-sales-count').textContent = salesCount;
+        }
+        if (_getEl('product-sales-qty')) {
+            _getEl('product-sales-qty').textContent = totalQty;
+        }
+        if (_getEl('product-sales-revenue')) {
+            _getEl('product-sales-revenue').textContent = formatMoney(totalRevenue);
+        }
+    }
+    
+    function viewProductSales(productId) {
+        const db = _getDb();
+        const product = db.products.find(p => p.id === productId);
+        if (!product) {
+            _showToast('Error', 'Product not found.', 'error');
+            return;
+        }
+        
+        // Find all sales containing this product
+        const salesWithProduct = [];
+        (db.sales || []).forEach(sale => {
+            (sale.items || []).forEach(item => {
+                // Match by product ID or SKU
+                if (item.productId === productId || (product.sku && item.sku === product.sku)) {
+                    salesWithProduct.push({
+                        sale: sale,
+                        item: item,
+                        qty: item.qty || 0,
+                        price: item.price || 0,
+                        total: (item.price || 0) * (item.qty || 0)
+                    });
+                }
+            });
+        });
+        
+        if (salesWithProduct.length === 0) {
+            _showToast('No sales', 'This product has not been sold yet.', 'info');
+            return;
+        }
+        
+        // Show modal with sales list
+        const modalWindow = UI.modalWindow || window.LitePos?.ui?.modalWindow;
+        if (!modalWindow) {
+            _showToast('Error', 'Modal system not available.', 'error');
+            return;
+        }
+        
+        // Build table HTML
+        let tableHtml = `
+            <div style="margin-bottom: 16px;">
+                <h4 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">Sales with "${product.name}"</h4>
+                <p style="margin: 0; font-size: 13px; color: var(--text-soft);">
+                    Total: ${salesWithProduct.length} sales | Units sold: ${salesWithProduct.reduce((sum, s) => sum + s.qty, 0)} | Revenue: ${formatMoney(salesWithProduct.reduce((sum, s) => sum + s.total, 0))}
+                </p>
+            </div>
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead style="position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--border);">
+                        <tr>
+                            <th style="padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--border);">Sale ID</th>
+                            <th style="padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--border);">Date</th>
+                            <th style="padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--border);">Customer</th>
+                            <th style="padding: 10px 12px; text-align: right; font-weight: 600; border-bottom: 1px solid var(--border);">Qty</th>
+                            <th style="padding: 10px 12px; text-align: right; font-weight: 600; border-bottom: 1px solid var(--border);">Price</th>
+                            <th style="padding: 10px 12px; text-align: right; font-weight: 600; border-bottom: 1px solid var(--border);">Product Total</th>
+                            <th style="padding: 10px 12px; text-align: right; font-weight: 600; border-bottom: 1px solid var(--border);">Sale Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+        salesWithProduct.forEach(s => {
+            const dateStr = (s.sale.createdAt || s.sale.updatedAt) ? new Date(s.sale.createdAt || s.sale.updatedAt).toLocaleString('en-GB', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            }) : '—';
+            const customerName = s.sale.customer?.name || 'Walk-in';
+            const saleTotal = (s.sale.items || []).reduce((sum, item) => sum + ((item.price || 0) * (item.qty || 0)), 0);
+            
+            tableHtml += `
+                <tr style="border-bottom: 1px solid var(--border-light);">
+                    <td style="padding: 10px 12px;">${s.sale.id || '—'}</td>
+                    <td style="padding: 10px 12px;">${dateStr}</td>
+                    <td style="padding: 10px 12px;">${customerName}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-family: monospace;">${s.qty}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-family: monospace;">${formatMoney(s.price)}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-family: monospace; font-weight: 600;">${formatMoney(s.total)}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-family: monospace; font-weight: 600; color: var(--accent);">${formatMoney(saleTotal)}</td>
+                </tr>`;
+        });
+        
+        tableHtml += `
+                    </tbody>
+                </table>
+            </div>`;
+        
+        modalWindow.show({
+            title: 'Product Sales History',
+            bodyHtml: tableHtml,
+            actions: [
+                {
+                    label: 'Close',
+                    variant: 'ghost',
+                    autofocus: true
+                }
+            ]
+        });
+    }
 
     function clearProductForm() {
         const els = _getEls();
+        
+        // Clear selected product ID from state
+        if (window.LitePos && window.LitePos.state) {
+            window.LitePos.state.selectedProductId = null;
+        }
+        
+        // Remove product selection highlight
+        const selectedRow = document.querySelector('tr.selected-product-row');
+        if (selectedRow) {
+            selectedRow.classList.remove('selected-product-row');
+        }
         if (_getEl('product-edit-name')) _getEl('product-edit-name').value = '';
         if (_getEl('product-edit-sku')) _getEl('product-edit-sku').value = '';
         
@@ -634,6 +836,7 @@
         // Hide stock adjustment and updates cards
         if (_getEl('stock-adjustment-card')) _getEl('stock-adjustment-card').style.display = 'none';
         if (_getEl('stock-updates-card')) _getEl('stock-updates-card').style.display = 'none';
+        if (_getEl('product-sales-card')) _getEl('product-sales-card').style.display = 'none';
         
         // Clear stock adjustment form
         if (_getEl('stock-adjustment-qty')) _getEl('stock-adjustment-qty').value = '';
@@ -763,7 +966,9 @@
         addBarcodeTag,
         removeBarcodeTag,
         getBarcodes,
-        setBarcodes
+        setBarcodes,
+        loadProductSalesStats,
+        viewProductSales
     };
 
     // ===== Barcode Tag Input =====

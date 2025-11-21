@@ -88,19 +88,51 @@
     };
 
     ns.pos.startNewSale = function (notify) {
+        console.log('[startNewSale] Called with notify:', notify);
         // Check for auto-saved sale first
         if (!notify && ns.pos.recoverAutoSavedSale && ns.pos.recoverAutoSavedSale()) {
+            console.log('[startNewSale] Recovered auto-saved sale, exiting');
             return; // Sale recovered, don't create new one
         }
         
+        console.log('[startNewSale] Creating empty sale...');
         ns.state.currentSale = ns.pos.createEmptySale();
+        console.log('[startNewSale] Empty sale created, items:', ns.state.currentSale.items.length);
         ns.state.currentSale.customer = null;
+        
+        // Clear customer from UI
+        if (window.setCurrentCustomer) {
+            window.setCurrentCustomer(null);
+        }
+        
+        // Re-enable customer fields (in case they were disabled from editing)
+        const customerPhoneInput = document.getElementById('customer-phone-input');
+        const customerSearchBtn = document.getElementById('btn-customer-search');
+        if (customerPhoneInput) {
+            customerPhoneInput.disabled = false;
+            customerPhoneInput.title = '';
+        }
+        if (customerSearchBtn) {
+            customerSearchBtn.disabled = false;
+            customerSearchBtn.title = '';
+        }
+        
+        // Clear cart title (reset to "New Sale")
+        const cartTitleEl = document.getElementById('cart-title-text');
+        if (cartTitleEl) cartTitleEl.textContent = 'New Sale';
+        
         const els = ns.elements || {};
         if (_getEl('input-discount')) _getEl('input-discount').value = '0';
         if (_getEl('input-payment')) _getEl('input-payment').value = '0';
-        if (_getEl('cart-table-body')) _getEl('cart-table-body').innerHTML = '';
+        const tbody = _getEl('cart-table-body');
+        if (tbody) {
+            console.log('[startNewSale] Clearing cart-table-body innerHTML');
+            tbody.innerHTML = '';
+            console.log('[startNewSale] cart-table-body cleared, innerHTML length:', tbody.innerHTML.length);
+        }
         
         // Properly sync cart UI state
+        console.log('[startNewSale] Calling syncCartEmptyState(false)');
         syncCartEmptyState(false);
         
         // Load default print size from global settings
@@ -115,7 +147,8 @@
         ns.pos.updateActionButtonsVisibility();
         
         if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip();
-        if (ns.pos.renderCartTable) ns.pos.renderCartTable();
+        // DON'T call renderCartTable here - it causes state sync issues
+        // Caller should call renderCartTable AFTER startNewSale returns
         if (ns.pos.updateSaleTotals) ns.pos.updateSaleTotals();
         if (notify && ns.ui && typeof ns.ui.showToast === 'function') ns.ui.showToast('New sale', 'Started a new sale.', 'success');
         if (_getEl('product-search')) { _getEl('product-search').focus();}
@@ -127,24 +160,55 @@
     ns.pos.updateActionButtonsVisibility = function () {
         const hasItems = ns.state.currentSale && Array.isArray(ns.state.currentSale.items) && ns.state.currentSale.items.length > 0;
         const hasSaleId = ns.state.currentSale && ns.state.currentSale.id;
+        const isEditing = hasSaleId && (ns.state.db.sales || []).some(s => s.id === hasSaleId);
         
         const btnNew = _getEl('btn-new-sale');
         const btnHold = _getEl('btn-hold-sale');
         const btnCancel = _getEl('btn-cancel-sale');
+        const btnCancelEdit = _getEl('btn-cancel-edit-sale');
+        const btnRevertChanges = _getEl('btn-revert-changes');
+        const btnComplete = _getEl('btn-complete-sale');
+        const btnCompleteTxt = btnComplete ? btnComplete.querySelector('.btn-text-main') : null;
+        const btnPrintReceipt = _getEl('btn-print-last-receipt');
+        const btnPrintTxt = btnPrintReceipt ? btnPrintReceipt.querySelector('.btn-text-main') : null;
+        const cartSubheader = document.getElementById('cart-subheader-bn');
+        const openSalesCard = document.getElementById('open-sales-card');
         
-        if (btnNew) {
-            // Show New Sale button always
-            btnNew.style.display = 'flex';
-        }
-        
-        if (btnHold) {
-            // Show Hold button only when there are items
-            btnHold.style.display = hasItems ? 'flex' : 'none';
-        }
-        
-        if (btnCancel) {
-            // Show Cancel button when there's a sale ID (open/editing) or items in cart
-            btnCancel.style.display = (hasSaleId || hasItems) ? 'flex' : 'none';
+        if (isEditing) {
+            // Editing mode - hide normal buttons, show cancel edit and revert changes
+            if (btnNew) btnNew.style.display = 'none';
+            if (btnHold) btnHold.style.display = 'none';
+            if (btnCancel) btnCancel.style.display = 'none';
+            if (btnCancelEdit) btnCancelEdit.style.display = 'flex';
+            if (btnRevertChanges) btnRevertChanges.style.display = 'flex';
+            if (btnCompleteTxt) btnCompleteTxt.textContent = 'Update Sale';
+            if (btnPrintTxt) btnPrintTxt.textContent = 'Print Receipt';
+            if (cartSubheader) cartSubheader.textContent = '· বিক্রয় সম্পাদনা';
+            // Force hide open sales card in editing mode
+            if (openSalesCard) {
+                openSalesCard.classList.add('hidden');
+                openSalesCard.style.display = 'none';
+            }
+        } else {
+            // Normal mode - show normal buttons, hide cancel edit and revert changes
+            if (btnNew) btnNew.style.display = 'flex';
+            if (btnHold) btnHold.style.display = hasItems ? 'flex' : 'none';
+            if (btnCancel) btnCancel.style.display = (hasSaleId || hasItems) ? 'flex' : 'none';
+            if (btnCancelEdit) btnCancelEdit.style.display = 'none';
+            if (btnRevertChanges) btnRevertChanges.style.display = 'none';
+            if (btnCompleteTxt) btnCompleteTxt.textContent = 'Complete & Close Sale';
+            if (btnPrintTxt) btnPrintTxt.textContent = 'Print last receipt';
+            if (cartSubheader) cartSubheader.textContent = '· নতুন বিক্রয়';
+            // Show open sales card if there are open sales
+            if (openSalesCard && ns.pos.renderOpenSalesStrip) {
+                const openSales = (ns.state.db.sales || []).filter(s => s.status === 'open');
+                if (openSales.length > 0) {
+                    openSalesCard.style.display = '';
+                    openSalesCard.classList.remove('hidden');
+                } else {
+                    openSalesCard.classList.add('hidden');
+                }
+            }
         }
     };
 
@@ -182,9 +246,14 @@
         const payment = ns.state.currentSale.payment || 0;
         const total = ns.state.currentSale.total;
         
-        // Calculate debt if payment < total AND customer is saved
+        // Get settings
+        const db = ns.state.db || {};
+        const settings = db.settings || {};
+        const enableDue = settings.enableDue !== false; // Default to true
+        
+        // Calculate debt if payment < total AND customer is saved AND due is enabled
         const hasSavedCustomer = ns.state.currentSale.customer && ns.state.currentSale.customer.phone;
-        if (hasSavedCustomer && payment < total) {
+        if (hasSavedCustomer && payment < total && enableDue) {
             ns.state.currentSale.debt = total - payment;
             ns.state.currentSale.change = 0;
         } else {
@@ -205,15 +274,27 @@
         if (_getEl('summary-items-count')) _getEl('summary-items-count').textContent = String(ns.state.currentSale.items.reduce((s, it) => s + it.qty, 0));
         if (_getEl('summary-change')) _getEl('summary-change').textContent = formatMoney(ns.state.currentSale.change);
         
-        // Show/hide debt row
-        const debtRow = document.getElementById('payment-row-debt');
-        const debtValue = document.getElementById('summary-debt');
-        if (debtRow && debtValue) {
-            if (ns.state.currentSale.debt > 0) {
-                debtRow.classList.remove('hidden');
-                debtValue.textContent = formatMoney(ns.state.currentSale.debt);
-            } else {
-                debtRow.classList.add('hidden');
+        // Show/hide Change and Due rows (exclusive)
+        const changeRow = document.getElementById('payment-row-change');
+        const dueRow = document.getElementById('payment-row-due');
+        const dueValue = document.getElementById('summary-due');
+        
+        if (ns.state.currentSale.debt > 0 && enableDue && hasSavedCustomer) {
+            // Show Due, hide Change
+            if (dueRow && dueValue) {
+                dueRow.classList.remove('hidden');
+                dueValue.textContent = formatMoney(ns.state.currentSale.debt);
+            }
+            if (changeRow) {
+                changeRow.classList.add('hidden');
+            }
+        } else {
+            // Show Change, hide Due
+            if (changeRow) {
+                changeRow.classList.remove('hidden');
+            }
+            if (dueRow) {
+                dueRow.classList.add('hidden');
             }
         }
         
@@ -235,26 +316,39 @@
     };
 
     ns.pos.renderCartTable = function () {
+        console.log('[renderCartTable] Called');
         const els = ns.elements || {};
         const tbody = _getEl('cart-table-body');
-        if (!tbody) return;
+        if (!tbody) {
+            console.log('[renderCartTable] cart-table-body not found!');
+            return;
+        }
+        console.log('[renderCartTable] Clearing tbody.innerHTML');
         tbody.innerHTML = '';
 
         if (!ns.state.currentSale) {
+            console.log('[renderCartTable] No currentSale, syncing empty state');
             syncCartEmptyState(false);
             return;
         }
 
         const hasItems = Array.isArray(ns.state.currentSale.items) && ns.state.currentSale.items.length > 0;
+        console.log('[renderCartTable] currentSale.items.length:', ns.state.currentSale.items.length, 'hasItems:', hasItems);
         syncCartEmptyState(hasItems);
         if (!hasItems) {
+            console.log('[renderCartTable] No items, updating totals and exiting');
             ns.pos.updateSaleTotals();
             return;
         }
+        console.log('[renderCartTable] Rendering', ns.state.currentSale.items.length, 'items');
 
         ns.state.currentSale.items.forEach((item, index) => {
-            const tr = document.createElement('tr');
+            const tr = document.createElement('tr'); tr.classList.add('cart-item-row');
             const tdName = document.createElement('td'); tdName.classList.add('cart-item-name'); tdName.textContent = item.name; tr.appendChild(tdName);
+            const tdBarcodeSKU = document.createElement('td');
+            tdBarcodeSKU.classList.add('cart-item-barcode-sku');
+            tdBarcodeSKU.textContent = item.barcode || item.sku || '';
+            tr.appendChild(tdBarcodeSKU);
             const tdQty = document.createElement('td');
             const qtyControls = document.createElement('div'); qtyControls.style.display = 'flex'; qtyControls.style.alignItems = 'center'; qtyControls.style.gap = '4px';
             const btnMinus = document.createElement('button'); btnMinus.type='button'; btnMinus.className='btn btn-ghost btn-lg'; btnMinus.textContent='−'; btnMinus.style.padding='2px 8px'; btnMinus.addEventListener('click', () => ns.pos.changeCartQty(index, -1));
@@ -263,7 +357,7 @@
             qtyControls.appendChild(btnMinus); qtyControls.appendChild(spanQty); qtyControls.appendChild(btnPlus); tdQty.appendChild(qtyControls); tr.appendChild(tdQty);
             const tdPrice = document.createElement('td'); tdPrice.textContent = ns.utils ? ns.utils.formatMoney(item.price) : ('৳ ' + item.price.toFixed(2)); tr.appendChild(tdPrice);
             const tdTotal = document.createElement('td'); tdTotal.textContent = ns.utils ? ns.utils.formatMoney(item.qty * item.price) : ('৳ ' + (item.qty * item.price).toFixed(2)); tr.appendChild(tdTotal);
-            const tdActions = document.createElement('td'); const btnRemove = document.createElement('button'); btnRemove.type='button'; btnRemove.className='btn btn-ghost btn-lg'; btnRemove.textContent='✕'; btnRemove.addEventListener('click', () => ns.pos.removeCartItem(index)); tdActions.appendChild(btnRemove); tr.appendChild(tdActions);
+            const tdActions = document.createElement('td'); tdActions.classList.add("row-right"); const btnRemove = document.createElement('button'); btnRemove.type='button'; btnRemove.className='btn btn-ghost btn-lg'; btnRemove.textContent='✕'; btnRemove.addEventListener('click', () => ns.pos.removeCartItem(index)); tdActions.appendChild(btnRemove); tr.appendChild(tdActions);
             tbody.appendChild(tr);
         });
 
@@ -276,9 +370,28 @@
         const item = ns.state.currentSale.items[index];
         const newQty = item.qty + delta;
         if (newQty <= 0) { ns.pos.removeCartItem(index); return; }
-        const product = ns.state.db.products.find(p => p.sku === item.sku);
-        if (product && newQty > product.stock) { if (ns.ui) ns.ui.showToast('Stock limit', `Only ${product.stock} in stock.`, 'error'); return; }
-        item.qty = newQty; ns.pos.renderCartTable();
+        
+        // Find product by productId (not SKU, since SKU is now optional)
+        const product = ns.state.db.products.find(p => p.id === item.productId);
+        if (!product) {
+            console.error('Product not found for cart item:', item);
+            return;
+        }
+        
+        // Calculate total quantity across all cart entries for this product
+        const totalQtyOtherEntries = ns.state.currentSale.items
+            .filter((it, idx) => it.productId === product.id && idx !== index)
+            .reduce((sum, it) => sum + it.qty, 0);
+        
+        const totalQtyWithChange = totalQtyOtherEntries + newQty;
+        
+        if (totalQtyWithChange > product.stock) { 
+            if (ns.ui) ns.ui.showToast('Stock limit', `Only ${product.stock} in stock.`, 'error'); 
+            return; 
+        }
+        
+        item.qty = newQty; 
+        ns.pos.renderCartTable();
     };
 
     ns.pos.removeCartItem = function (index) {
@@ -287,22 +400,75 @@
         ns.pos.renderCartTable();
     };
 
-    ns.pos.addProductToCart = function (sku, barcodeUsed) {
+    ns.pos.addProductToCart = function (productIdOrSku, matchedBarcode, productSku) {
         if (!ns.state.currentSale) ns.state.currentSale = ns.pos.createEmptySale();
-        const product = ns.state.db.products.find(p => p.sku === sku);
-        if (!product) return;
-        const existing = ns.state.currentSale.items.find(it => it.sku === sku);
-        const currentQty = existing ? existing.qty : 0;
-        if (currentQty + 1 > product.stock) { if (ns.ui) ns.ui.showToast('Stock limit', `Only ${product.stock} in stock.`, 'error'); return; }
+        
+        // Try to find product by ID first, then by SKU/barcode for backward compatibility
+        let product = ns.state.db.products.find(p => p.id === productIdOrSku);
+        if (!product) {
+            // Fallback: try SKU or barcode
+            product = ns.state.db.products.find(p => 
+                p.sku === productIdOrSku || 
+                (p.barcode && p.barcode.split(',').map(b => b.trim()).includes(productIdOrSku))
+            );
+        }
+        
+        if (!product) {
+            console.error('Product not found:', productIdOrSku);
+            return;
+        }
+        
+        // Get settings flag for barcode splitting behavior
+        const settings = ns.state.db?.settings || {};
+        const splitByBarcode = settings.splitCartEntriesForDifferentBarcodes || false;
+        
+        // Determine which barcode was actually used for this cart entry
+        // Priority: matchedBarcode (from search/scan) > first product barcode > null
+        const usedBarcode = matchedBarcode || (product.barcode ? product.barcode.split(',')[0].trim() : null);
+        
+        // Determine which SKU to use
+        // Priority: productSku (passed explicitly) > product.sku > null
+        const usedSku = productSku || product.sku || null;
+        
+        // Find existing item:
+        // - If splitByBarcode is true: match by productId AND barcode
+        // - If splitByBarcode is false: match by productId only (default behavior)
+        let existing;
+        if (splitByBarcode && usedBarcode) {
+            // Split entries: find by both product ID and specific barcode
+            existing = ns.state.currentSale.items.find(it => 
+                it.productId === product.id && it.barcode === usedBarcode
+            );
+        } else {
+            // Combine entries: find by product ID only
+            existing = ns.state.currentSale.items.find(it => it.productId === product.id);
+        }
+        
+        // Calculate total quantity across all entries for this product (for stock validation)
+        const totalQtyInCart = ns.state.currentSale.items
+            .filter(it => it.productId === product.id)
+            .reduce((sum, it) => sum + it.qty, 0);
+        
+        if (totalQtyInCart + 1 > product.stock) { 
+            if (ns.ui) ns.ui.showToast('Stock limit', `Only ${product.stock} in stock.`, 'error'); 
+            return; 
+        }
+        
         if (existing) {
             existing.qty += 1;
-            // Update barcode if a different one was used
-            if (barcodeUsed && !existing.barcode) existing.barcode = barcodeUsed;
+            // Update barcode if a different one was used (only in non-split mode)
+            if (!splitByBarcode && matchedBarcode && !existing.barcode) {
+                existing.barcode = matchedBarcode;
+            }
+            // Update SKU if not already set
+            if (!existing.sku && usedSku) {
+                existing.sku = usedSku;
+            }
         } else {
             ns.state.currentSale.items.push({
                 productId: product.id,
-                sku: product.sku || null,
-                barcode: barcodeUsed || (product.barcode ? product.barcode.split(',')[0].trim() : null),
+                sku: usedSku,
+                barcode: usedBarcode,
                 name: product.name,
                 qty: 1,
                 price: product.sellPrice,
@@ -311,26 +477,6 @@
         }
         ns.pos.renderCartTable();
     };
-
-    ns.pos.renderProductSearchTable = function () {
-        const tbody = (ns.elements && ns.elements['product-table-body']);
-        if (!tbody) return;
-        tbody.innerHTML = '';
-        const query = ((ns.elements && ns.elements['product-search'] && ns.elements['product-search'].value) || '').trim().toLowerCase();
-        const products = ns.state.db.products || [];
-        const filtered = products.filter(p => { if (!query) return true; const text = (p.name + ' ' + p.sku).toLowerCase(); return text.includes(query); });
-        filtered.forEach((p, idx) => {
-            const tr = document.createElement('tr'); tr.addEventListener('click', () => ns.pos.addProductToCart(p.sku));
-            const tdName = document.createElement('td'); tdName.textContent = p.name; tr.appendChild(tdName);
-            const tdSku = document.createElement('td'); tdSku.textContent = p.sku; tr.appendChild(tdSku);
-            const tdSell = document.createElement('td'); tdSell.textContent = ns.utils ? ns.utils.formatMoney(p.sellPrice) : ('৳ ' + p.sellPrice.toFixed(2)); tr.appendChild(tdSell);
-            const tdStock = document.createElement('td'); tdStock.textContent = String(p.stock); if (p.stock <= (p.lowStockAt || 0)) tdStock.style.color = '#facc15'; tr.appendChild(tdStock);
-            const tdBtn = document.createElement('td'); const btn = document.createElement('button'); btn.type='button'; btn.className='btn btn-primary btn-lg'; btn.textContent='Add'; btn.addEventListener('click', ev => { ev.stopPropagation(); ns.pos.addProductToCart(p.sku); }); tdBtn.appendChild(btn); tr.appendChild(tdBtn);
-            tbody.appendChild(tr);
-        });
-    };
-
-    ns.pos.focusProductSearch = function () { if (ns.elements && ns.elements['product-search']) { ns.elements['product-search'].focus(); ns.elements['product-search'].select(); } };
 
     // Auto-save current sale to localStorage for recovery after refresh
     ns.pos.autoSaveCurrentSale = function () {
@@ -363,6 +509,9 @@
                         window.LitePos.customers.setCurrentCustomer(sale.customer);
                     }
                     
+                    // Check if editing existing sale
+                    const isEditing = sale.id && (ns.state.db.sales || []).some(s => s.id === sale.id);
+                    
                     // Update sale status and ID display for editing mode
                     const els = ns.elements || {};
                     if (sale.id) {
@@ -373,9 +522,67 @@
                         if (_getEl('summary-sale-id-value')) {
                             _getEl('summary-sale-id-value').textContent = sale.id;
                         }
+                        
+                        // Update cart title for editing
+                        const cartTitleEl = document.getElementById('cart-title-text');
+                        if (cartTitleEl) {
+                            const statusLabel = sale.status === 'closed' ? 'Editing Closed Sale' : 'Editing Sale';
+                            cartTitleEl.textContent = statusLabel;
+                        }
+                        
+                        // Disable customer fields if editing with customer
+                        if (sale.customer && sale.customer.phone) {
+                            const customerPhoneInput = document.getElementById('customer-phone-input');
+                            const customerSearchBtn = document.getElementById('btn-customer-search');
+                            if (customerPhoneInput) {
+                                customerPhoneInput.disabled = true;
+                                customerPhoneInput.title = 'Cannot change customer for existing sales';
+                            }
+                            if (customerSearchBtn) {
+                                customerSearchBtn.disabled = true;
+                                customerSearchBtn.title = 'Cannot change customer for existing sales';
+                            }
+                        }
                     } else {
                         if (_getEl('summary-sale-status')) _getEl('summary-sale-status').textContent = 'New Sale';
                         if (_getEl('summary-sale-id-value')) _getEl('summary-sale-id-value').textContent = 'New';
+                    }
+                    
+                    // Restore payment method UI
+                    const paymentMethodPills = document.querySelectorAll('.payment-method-pill');
+                    if (paymentMethodPills) {
+                        paymentMethodPills.forEach(pill => {
+                            if (pill.dataset.method === (sale.payment_method || 'cash')) {
+                                pill.classList.add('active');
+                            } else {
+                                pill.classList.remove('active');
+                            }
+                        });
+                    }
+                    
+                    // Show payment details field if method is not cash
+                    const paymentDetailsRow = document.getElementById('payment-details-row');
+                    const paymentDetailsInput = document.getElementById('input-payment-details');
+                    if (paymentDetailsRow && paymentDetailsInput) {
+                        if (sale.payment_method && sale.payment_method !== 'cash') {
+                            paymentDetailsRow.classList.remove('hidden');
+                            paymentDetailsInput.value = sale.payment_details || '';
+                            // Set placeholder
+                            switch(sale.payment_method) {
+                                case 'card':
+                                    paymentDetailsInput.placeholder = 'Card number (last 4 digits)';
+                                    break;
+                                case 'bkash':
+                                    paymentDetailsInput.placeholder = 'bKash number';
+                                    break;
+                                case 'nagad':
+                                    paymentDetailsInput.placeholder = 'Nagad number';
+                                    break;
+                            }
+                        } else {
+                            paymentDetailsRow.classList.add('hidden');
+                            paymentDetailsInput.value = '';
+                        }
                     }
                     
                     // Ensure cart UI state is properly synced
@@ -440,11 +647,36 @@
 
         // If there's a different sale with items, ask to save it first
         if (activeHasItems && activeSaleId && activeSaleId !== saleId) {
-            if (!confirm(`Save current sale ${activeSaleId} before loading ${saleId}?`)) {
+            const modalNotifier = ns.ui?.modalNotifier;
+            if (!modalNotifier) {
+                if (!confirm(`Save current sale ${activeSaleId} before loading ${saleId}?`)) {
+                    return;
+                }
+                if (ns.pos.holdCurrentSale) ns.pos.holdCurrentSale();
+            } else {
+                modalNotifier.show({
+                    type: 'info',
+                    title: 'Save Current Sale',
+                    message: `Save current sale ${activeSaleId} before loading sale ${saleId}?`,
+                    actions: [
+                        {
+                            label: 'Yes, save & continue',
+                            variant: 'primary',
+                            autofocus: true,
+                            onClick: () => {
+                                if (ns.pos.holdCurrentSale) ns.pos.holdCurrentSale();
+                                // Continue loading the sale after save
+                                setTimeout(() => ns.pos.loadOpenSale(saleId), 100);
+                            }
+                        },
+                        {
+                            label: 'Cancel',
+                            variant: 'ghost'
+                        }
+                    ]
+                });
                 return;
             }
-            // Hold the current sale
-            if (ns.pos.holdCurrentSale) ns.pos.holdCurrentSale();
         }
 
         // Load the sale
@@ -510,31 +742,90 @@
     ns.pos.cancelCurrentSale = function () {
         const hasItems = ns.state.currentSale && Array.isArray(ns.state.currentSale.items) && ns.state.currentSale.items.length > 0;
         
+        const modalNotifier = (ns.ui && ns.ui.modalNotifier) || window.LitePos?.ui?.modalNotifier;
+        
         // If cart has items, ask for confirmation
-        if (hasItems && !confirm('Discard cart items and cancel sale?')) {
-            return;
+        if (hasItems) {
+            if (modalNotifier) {
+                modalNotifier.show({
+                    type: 'warning',
+                    title: 'Discard Cart',
+                    message: 'Are you sure you want to discard all cart items and cancel this sale?',
+                    actions: [
+                        {
+                            label: 'Yes, discard items',
+                            variant: 'danger',
+                            autofocus: true,
+                            onClick: () => proceedCancelSale()
+                        },
+                        {
+                            label: 'Keep editing',
+                            variant: 'ghost'
+                        }
+                    ]
+                });
+                return;
+            } else if (!confirm('Discard cart items and cancel sale?')) {
+                return;
+            }
         }
         
+        proceedCancelSale();
+    };
+
+    function proceedCancelSale() {
         if (!ns.state.currentSale || !ns.state.currentSale.id) { 
             if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
-            ns.pos.startNewSale(false); 
+            ns.pos.startNewSale(true); // Use notify=true to clear auto-save and skip recovery
             if (ns.ui) ns.ui.showToast('Sale cleared', 'Cancelled unsaved sale.', 'success'); 
             return; 
         }
         const idx = ns.state.db.sales.findIndex(s => s.id === ns.state.currentSale.id && s.status === 'open');
         if (idx === -1) { 
             if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
-            ns.pos.startNewSale(false); 
+            ns.pos.startNewSale(true); // Use notify=true to clear auto-save and skip recovery
             return; 
         }
-        if (!confirm(`Cancel open sale ${ns.state.currentSale.id}? It will be removed.`)) return;
-        ns.state.db.sales.splice(idx, 1);
-        if (ns.api && typeof ns.api.saveDb === 'function') ns.api.saveDb(); else localStorage.setItem(ns.api && ns.api.DB_KEY ? ns.api.DB_KEY : 'litepos_bdt_db_v1', JSON.stringify(ns.state.db));
-        if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
-        ns.pos.startNewSale(false); 
-        if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip(); 
-        if (ns.ui) ns.ui.showToast('Sale cancelled', 'Open sale removed.', 'success');
-    };
+        
+        const saleId = ns.state.currentSale.id;
+        const modalNotifier = (ns.ui && ns.ui.modalNotifier) || window.LitePos?.ui?.modalNotifier;
+        
+        if (modalNotifier) {
+            modalNotifier.show({
+                type: 'danger',
+                title: 'Cancel Open Sale',
+                message: `Are you sure you want to cancel and permanently remove open sale ${saleId}? This action cannot be undone.`,
+                actions: [
+                    {
+                        label: 'Yes, remove sale',
+                        variant: 'danger',
+                        autofocus: true,
+                        onClick: () => {
+                            ns.state.db.sales.splice(idx, 1);
+                            if (ns.api && typeof ns.api.saveDb === 'function') ns.api.saveDb(); else localStorage.setItem(ns.api && ns.api.DB_KEY ? ns.api.DB_KEY : 'litepos_bdt_db_v1', JSON.stringify(ns.state.db));
+                            if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
+                            ns.pos.startNewSale(true); // Use notify=true to clear auto-save and skip recovery 
+                            if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip(); 
+                            if (ns.ui) ns.ui.showToast('Sale cancelled', 'Open sale removed.', 'success');
+                        }
+                    },
+                    {
+                        label: 'Keep sale',
+                        variant: 'ghost'
+                    }
+                ]
+            });
+        } else if (!confirm(`Cancel open sale ${ns.state.currentSale.id}? It will be removed.`)) {
+            return;
+        } else {
+            ns.state.db.sales.splice(idx, 1);
+            if (ns.api && typeof ns.api.saveDb === 'function') ns.api.saveDb(); else localStorage.setItem(ns.api && ns.api.DB_KEY ? ns.api.DB_KEY : 'litepos_bdt_db_v1', JSON.stringify(ns.state.db));
+            if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
+            ns.pos.startNewSale(true); // Use notify=true to clear auto-save and skip recovery 
+            if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip(); 
+            if (ns.ui) ns.ui.showToast('Sale cancelled', 'Open sale removed.', 'success');
+        }
+    }
 
     ns.pos.completeCurrentSale = function () {
         if (!ns.state.currentSale || ns.state.currentSale.items.length === 0) { if (ns.ui) ns.ui.showToast('Complete sale', 'Cart is empty.', 'error'); return; }
@@ -542,11 +833,50 @@
         ns.pos.updateSaleTotals();
         if (ns.state.currentSale.total <= 0) { if (ns.ui) ns.ui.showToast('Complete sale', 'Total must be greater than 0.', 'error'); return; }
         
-        // Allow debt for saved customers, but not for walk-ins
+        // Get settings
+        const db = ns.state.db || {};
+        const settings = db.settings || {};
+        const enableDue = settings.enableDue !== false; // Default to true
+        
+        // Allow debt for saved customers if enabled, but not for walk-ins
         const hasSavedCustomer = ns.state.currentSale.customer && ns.state.currentSale.customer.phone;
-        if (!hasSavedCustomer && (ns.state.currentSale.payment || 0) < ns.state.currentSale.total) {
-            if (ns.ui) ns.ui.showToast('Payment insufficient', 'Walk-in customers must pay in full. Add customer details to allow debt.', 'error');
+        const payment = ns.state.currentSale.payment || 0;
+        const total = ns.state.currentSale.total;
+        const debt = total - payment;
+        
+        if (!hasSavedCustomer && payment < total) {
+            if (ns.ui) ns.ui.showToast('Payment insufficient', 'Walk-in customers must pay in full. Add customer details to allow due.', 'error');
             return;
+        }
+        
+        // Check if due is enabled
+        if (hasSavedCustomer && payment < total && !enableDue) {
+            if (ns.ui) ns.ui.showToast('Due disabled', 'Due/Debt tracking is disabled in POS settings. Payment must equal total.', 'error');
+            return;
+        }
+        
+        // Check debt limits for saved customers
+        if (hasSavedCustomer && payment < total && enableDue) {
+            // Calculate current debt for this customer
+            const customerPhone = ns.state.currentSale.customer.phone;
+            const customer = db.customers.find(c => c.phone === customerPhone);
+            const currentDebt = ns.customers && ns.customers.calculateCustomerDebt 
+                ? ns.customers.calculateCustomerDebt(customerPhone)
+                : db.sales.filter(s => s.status === 'closed' && s.customer && s.customer.phone === customerPhone)
+                    .reduce((sum, s) => sum + (s.debt || 0), 0);
+            
+            const newTotalDebt = currentDebt + debt;
+            
+            // Check debt limit (per-customer or global)
+            const maxDebtLimit = customer && customer.debt_limit !== undefined 
+                ? customer.debt_limit 
+                : (settings.maxDebtLimit || 0);
+            
+            if (maxDebtLimit > 0 && newTotalDebt > maxDebtLimit) {
+                const formatMoney = (v) => ns.utils && ns.utils.formatMoney ? ns.utils.formatMoney(v) : ('৳ ' + Number(v || 0).toFixed(2));
+                if (ns.ui) ns.ui.showToast('Debt limit exceeded', `Customer debt limit is ${formatMoney(maxDebtLimit)}. Current: ${formatMoney(currentDebt)}, would become: ${formatMoney(newTotalDebt)}`, 'error');
+                return;
+            }
         }
         
         const now = new Date().toISOString(); ns.state.currentSale.status = 'closed'; ns.state.currentSale.updatedAt = now; if (!ns.state.currentSale.createdAt) ns.state.currentSale.createdAt = now;
@@ -565,14 +895,17 @@
         ns.state.lastClosedSaleId = ns.state.currentSale.id;
         if (ns.elements && ns.elements['summary-sale-status']) ns.elements['summary-sale-status'].textContent = `Closed · ${ns.state.currentSale.id}`;
         if (ns.ui) ns.ui.showToast('Sale completed', `Sale ${ns.state.currentSale.id} closed.`, 'success');
-        if (ns.pos.renderCartTable) ns.pos.renderCartTable(); if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip(); if (ns.pos.renderProductsTable) ns.pos.renderProductsTable && ns.pos.renderProductsTable(); if (ns.pos.renderCustomersTable) ns.pos.renderCustomersTable && ns.pos.renderCustomersTable();
-        if (ns.pos.refreshKpis) ns.pos.refreshKpis && ns.pos.refreshKpis(); if (ns.pos.renderSalesTable) ns.pos.renderSalesTable && ns.pos.renderSalesTable();
         if (ns.pos.fillReceiptFromSale) ns.pos.fillReceiptFromSale && ns.pos.fillReceiptFromSale(saleCopy);
         
         // Clear auto-save after completing sale
         if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
         
-        ns.pos.startNewSale(true); 
+        // Start new sale and clear everything
+        ns.pos.startNewSale(true);
+        
+        // Refresh all views after starting new sale
+        if (ns.pos.renderCartTable) ns.pos.renderCartTable(); if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip(); if (ns.pos.renderProductsTable) ns.pos.renderProductsTable && ns.pos.renderProductsTable(); if (ns.pos.renderCustomersTable) ns.pos.renderCustomersTable && ns.pos.renderCustomersTable();
+        if (ns.pos.refreshKpis) ns.pos.refreshKpis && ns.pos.refreshKpis(); if (ns.pos.renderSalesTable) ns.pos.renderSalesTable && ns.pos.renderSalesTable(); 
         if (ns.pos.renderTodaySnapshot) ns.pos.renderTodaySnapshot && ns.pos.renderTodaySnapshot();
     };
 

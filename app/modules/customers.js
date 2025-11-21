@@ -97,14 +97,25 @@
                 tr.appendChild(tdNotes);
 
                 const tdDebt = document.createElement('td');
-                tdDebt.style.textAlign = 'center';
+                tdDebt.style.textAlign = 'left';
                 const debt = calculateCustomerDebt(c.phone);
+                const settings = db.settings || {};
+                const maxDebtLimit = c.debt_limit !== undefined ? c.debt_limit : (settings.maxDebtLimit || 0);
+                
                 if (debt > 0) {
-                    tdDebt.textContent = formatMoney(debt);
-                    tdDebt.style.color = 'var(--danger)';
-                    tdDebt.style.fontWeight = '700';
+                    const debtText = formatMoney(debt);
+                    // Show debt limit if it exists and differs from global
+                    if (maxDebtLimit > 0) {
+                        tdDebt.innerHTML = `<span style="color: var(--danger); font-weight: 700;">${debtText}</span><br><span style="font-size: 11px; color: var(--muted);">(max ${formatMoney(maxDebtLimit)})</span>`;
+                    } else {
+                        tdDebt.innerHTML = `<span style="color: var(--danger); font-weight: 700;">${debtText}</span>`;
+                    }
                 } else {
-                    tdDebt.textContent = '—';
+                    if (maxDebtLimit > 0) {
+                        tdDebt.innerHTML = `—<br><span style="font-size: 11px; color: var(--muted);">(max ${formatMoney(maxDebtLimit)})</span>`;
+                    } else {
+                        tdDebt.textContent = '—';
+                    }
                 }
                 tr.appendChild(tdDebt);
 
@@ -143,6 +154,7 @@
         if (_getEl('customer-edit-phone')) _getEl('customer-edit-phone').value = c.phone;
         if (_getEl('customer-edit-address')) _getEl('customer-edit-address').value = c.address || '';
         if (_getEl('customer-edit-notes')) _getEl('customer-edit-notes').value = c.notes || '';
+        if (_getEl('customer-edit-debt-limit')) _getEl('customer-edit-debt-limit').value = c.debt_limit !== undefined ? c.debt_limit : '';
         if (_getEl('customer-edit-name')) _getEl('customer-edit-name').dataset.customerId = c.id;
     }
 
@@ -152,6 +164,7 @@
         if (_getEl('customer-edit-phone')) _getEl('customer-edit-phone').value = '';
         if (_getEl('customer-edit-address')) _getEl('customer-edit-address').value = '';
         if (_getEl('customer-edit-notes')) _getEl('customer-edit-notes').value = '';
+        if (_getEl('customer-edit-debt-limit')) _getEl('customer-edit-debt-limit').value = '';
         if (_getEl('customer-edit-name')) delete _getEl('customer-edit-name').dataset.customerId;
     }
 
@@ -162,6 +175,8 @@
         const phone = (_getEl('customer-edit-phone') && _getEl('customer-edit-phone').value || '').trim();
         const address = (_getEl('customer-edit-address') && _getEl('customer-edit-address').value || '').trim();
         const notes = (_getEl('customer-edit-notes') && _getEl('customer-edit-notes').value || '').trim();
+        const debtLimitValue = (_getEl('customer-edit-debt-limit') && _getEl('customer-edit-debt-limit').value || '').trim();
+        const debtLimit = debtLimitValue ? parseFloat(debtLimitValue) : undefined; // undefined = use global
         if (!name) return _showToast('Customer', 'Name is required.', 'error');
 
         const existingId = _getEl('customer-edit-name') && _getEl('customer-edit-name').dataset.customerId;
@@ -180,6 +195,7 @@
             customer.phone = phone;
             customer.address = address;
             customer.notes = notes;
+            customer.debt_limit = debtLimit;
         } else {
             customer = {
                 id: 'c' + (db.customers.length + 1),
@@ -187,6 +203,7 @@
                 phone,
                 address,
                 notes,
+                debt_limit: debtLimit,
                 lastSaleAt: null,
                 lastSaleTotal: 0
             };
@@ -340,18 +357,48 @@
         if (!customer) return;
         
         // Confirm deletion
-        const confirmed = confirm(`Delete customer "${customer.name}"?\n\nThis action cannot be undone.`);
-        if (!confirmed) return;
-        
-        // Remove customer from array
-        const idx = db.customers.findIndex(c => c.id === id);
-        if (idx > -1) {
-            db.customers.splice(idx, 1);
-            if (API && typeof API.saveDb === 'function') API.saveDb();
-            else if (typeof window.saveDb === 'function') window.saveDb();
-            renderCustomersTable();
-            _showToast('Customer deleted', `${customer.name} has been removed.`, 'success');
+        const modalNotifier = window.LitePos?.ui?.modalNotifier;
+        if (!modalNotifier) {
+            const confirmed = confirm(`Delete customer "${customer.name}"?\n\nThis action cannot be undone.`);
+            if (!confirmed) return;
+            
+            const idx = db.customers.findIndex(c => c.id === id);
+            if (idx > -1) {
+                db.customers.splice(idx, 1);
+                if (API && typeof API.saveDb === 'function') API.saveDb();
+                else if (typeof window.saveDb === 'function') window.saveDb();
+                renderCustomersTable();
+                _showToast('Customer deleted', `${customer.name} has been removed.`, 'success');
+            }
+            return;
         }
+        
+        modalNotifier.show({
+            type: 'danger',
+            title: 'Delete Customer',
+            message: `Are you sure you want to delete customer "${customer.name}"?\n\nThis action cannot be undone.`,
+            actions: [
+                {
+                    label: 'Yes, delete customer',
+                    variant: 'danger',
+                    autofocus: true,
+                    onClick: () => {
+                        const idx = db.customers.findIndex(c => c.id === id);
+                        if (idx > -1) {
+                            db.customers.splice(idx, 1);
+                            if (API && typeof API.saveDb === 'function') API.saveDb();
+                            else if (typeof window.saveDb === 'function') window.saveDb();
+                            renderCustomersTable();
+                            _showToast('Customer deleted', `${customer.name} has been removed.`, 'success');
+                        }
+                    }
+                },
+                {
+                    label: 'Cancel',
+                    variant: 'ghost'
+                }
+            ]
+        });
     }
 
     function formatMoney(v) {
