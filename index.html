@@ -389,6 +389,36 @@
                                 <div id="summary-total" class="payment-value money payment-total">৳ 0.00</div>
                             </div>
 
+                            <!-- Payment Method Selection -->
+                            <div class="payment-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                                <label class="payment-label">Payment Method · পেমেন্ট পদ্ধতি</label>
+                                <div class="payment-method-pills">
+                                    <button type="button" class="payment-method-pill active" data-method="cash">
+                                        <span>💵</span>
+                                        <span>Cash</span>
+                                    </button>
+                                    <button type="button" class="payment-method-pill" data-method="card">
+                                        <span>💳</span>
+                                        <span>Card</span>
+                                    </button>
+                                    <button type="button" class="payment-method-pill" data-method="bkash">
+                                        <img src="https://www.logo.wine/a/logo/BKash/BKash-Logo.wine.svg" alt="bKash" class="payment-logo">
+                                        <span>bKash</span>
+                                    </button>
+                                    <button type="button" class="payment-method-pill" data-method="nagad">
+                                        <img src="https://www.logo.wine/a/logo/Nagad/Nagad-Logo.wine.svg" alt="Nagad" class="payment-logo">
+                                        <span>Nagad</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Payment Details (for Card/bKash/Nagad) -->
+                            <div id="payment-details-row" class="payment-row hidden" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                                <label class="payment-label" for="input-payment-details">Payment Details</label>
+                                <input id="input-payment-details" type="text" class="field-input field-input-sm" 
+                                       placeholder="Card number, bKash number, etc." style="width: 100%;">
+                            </div>
+
                             <!-- Payment input with "Same as Payable" button -->
                             <div class="payment-row">
                                 <label class="payment-label" for="input-payment">Payment Received · প্রাপ্ত</label>
@@ -405,6 +435,12 @@
                             <div class="payment-row">
                                 <label class="payment-label">Change · ফেরত</label>
                                 <div id="summary-change" class="payment-value money">৳ 0.00</div>
+                            </div>
+
+                            <!-- Debt (only shown when payment < total for saved customers) -->
+                            <div id="payment-row-debt" class="payment-row hidden">
+                                <label class="payment-label" style="color: var(--danger);">Debt Added · বকেয়া</label>
+                                <div id="summary-debt" class="payment-value money" style="color: var(--danger); font-weight: 700;">৳ 0.00</div>
                             </div>
 
                             <!-- Sale info -->
@@ -558,7 +594,7 @@
 
         <!-- TAB: CUSTOMERS -->
         <div id="tab-customers" class="tab-content hidden">
-            <div class="grid-two">
+            <div class="grid-main">
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">
@@ -578,12 +614,13 @@
                             <table>
                                 <thead>
                                 <tr>
-                                    <th style="width: 22%;">Name</th>
-                                    <th style="width: 18%;" class="center">Phone</th>
-                                    <th style="width: 20%;">Address</th>
+                                    <th style="width: 20%;">Name</th>
+                                    <th style="width: 15%;" class="center">Phone</th>
+                                    <th style="width: 18%;">Address</th>
                                     <th>Notes</th>
-                                    <th style="width: 18%;">Last sale</th>
-                                    <th style="width: 10%;" class="center">Actions</th>
+                                    <th style="width: 12%;" class="center">Debt</th>
+                                    <th style="width: 15%;">Last sale</th>
+                                    <th style="width: 8%;" class="center">Actions</th>
                                 </tr>
                                 </thead>
                                 <tbody id="customers-table-body">

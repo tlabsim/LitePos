@@ -53,9 +53,12 @@
             items: [],
             discount: 0,
             payment: 0,
+            debt: 0,
             subtotal: 0,
             total: 0,
             change: 0,
+            payment_method: 'cash',
+            payment_details: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             customer: null,
@@ -175,7 +178,20 @@
         ns.state.currentSale.subtotal = subtotal;
         ns.pos.clampDiscount();
         ns.state.currentSale.total = Math.max(0, subtotal - (ns.state.currentSale.discount || 0));
-        ns.state.currentSale.change = Math.max(0, (ns.state.currentSale.payment || 0) - ns.state.currentSale.total);
+        
+        const payment = ns.state.currentSale.payment || 0;
+        const total = ns.state.currentSale.total;
+        
+        // Calculate debt if payment < total AND customer is saved
+        const hasSavedCustomer = ns.state.currentSale.customer && ns.state.currentSale.customer.phone;
+        if (hasSavedCustomer && payment < total) {
+            ns.state.currentSale.debt = total - payment;
+            ns.state.currentSale.change = 0;
+        } else {
+            ns.state.currentSale.debt = 0;
+            ns.state.currentSale.change = Math.max(0, payment - total);
+        }
+        
         ns.state.currentSale.updatedAt = new Date().toISOString();
         
         // Auto-save current sale to localStorage for recovery after refresh
@@ -188,6 +204,18 @@
         if (_getEl('sale-header-total')) _getEl('sale-header-total').textContent = formatMoney(ns.state.currentSale.total);
         if (_getEl('summary-items-count')) _getEl('summary-items-count').textContent = String(ns.state.currentSale.items.reduce((s, it) => s + it.qty, 0));
         if (_getEl('summary-change')) _getEl('summary-change').textContent = formatMoney(ns.state.currentSale.change);
+        
+        // Show/hide debt row
+        const debtRow = document.getElementById('payment-row-debt');
+        const debtValue = document.getElementById('summary-debt');
+        if (debtRow && debtValue) {
+            if (ns.state.currentSale.debt > 0) {
+                debtRow.classList.remove('hidden');
+                debtValue.textContent = formatMoney(ns.state.currentSale.debt);
+            } else {
+                debtRow.classList.add('hidden');
+            }
+        }
         
         // Update discount percentage
         if (_getEl('discount-percentage')) {
@@ -513,7 +541,14 @@
         if (!ns.state.currentSale.customer) { const walkIn = ns.state.db.customers.find(c => c.phone === '') || ns.state.db.customers[0]; ns.state.currentSale.customer = walkIn || null; }
         ns.pos.updateSaleTotals();
         if (ns.state.currentSale.total <= 0) { if (ns.ui) ns.ui.showToast('Complete sale', 'Total must be greater than 0.', 'error'); return; }
-        if ((ns.state.currentSale.payment || 0) < ns.state.currentSale.total) { if (ns.ui) ns.ui.showToast('Payment insufficient', 'Payment must cover total.', 'error'); return; }
+        
+        // Allow debt for saved customers, but not for walk-ins
+        const hasSavedCustomer = ns.state.currentSale.customer && ns.state.currentSale.customer.phone;
+        if (!hasSavedCustomer && (ns.state.currentSale.payment || 0) < ns.state.currentSale.total) {
+            if (ns.ui) ns.ui.showToast('Payment insufficient', 'Walk-in customers must pay in full. Add customer details to allow debt.', 'error');
+            return;
+        }
+        
         const now = new Date().toISOString(); ns.state.currentSale.status = 'closed'; ns.state.currentSale.updatedAt = now; if (!ns.state.currentSale.createdAt) ns.state.currentSale.createdAt = now;
         ns.state.currentSale.lastModifiedBy = (ns.state.currentUser && ns.state.currentUser.id) || ns.state.currentSale.lastModifiedBy;
         if (!ns.state.currentSale.id) { const newId = 'S' + String(ns.state.db.counters.nextSaleId++).padStart(4, '0'); ns.state.currentSale.id = newId; }

@@ -909,6 +909,59 @@
             });
         }
 
+        // POS: Payment method selection
+        const paymentMethodPills = document.querySelectorAll('.payment-method-pill');
+        paymentMethodPills.forEach(pill => {
+            pill.addEventListener('click', function() {
+                // Remove active from all
+                paymentMethodPills.forEach(p => p.classList.remove('active'));
+                // Add active to clicked
+                this.classList.add('active');
+                
+                // Get selected method
+                const method = this.getAttribute('data-method');
+                
+                // Update current sale
+                if (currentSale) {
+                    currentSale.payment_method = method;
+                }
+                
+                // Show/hide payment details field (for card/bkash/nagad)
+                const paymentDetailsRow = document.getElementById('payment-details-row');
+                const paymentDetailsInput = document.getElementById('input-payment-details');
+                if (method === 'cash') {
+                    paymentDetailsRow.classList.add('hidden');
+                    if (paymentDetailsInput) paymentDetailsInput.value = '';
+                } else {
+                    paymentDetailsRow.classList.remove('hidden');
+                    // Set placeholder based on method
+                    if (paymentDetailsInput) {
+                        switch(method) {
+                            case 'card':
+                                paymentDetailsInput.placeholder = 'Card number (last 4 digits)';
+                                break;
+                            case 'bkash':
+                                paymentDetailsInput.placeholder = 'bKash number';
+                                break;
+                            case 'nagad':
+                                paymentDetailsInput.placeholder = 'Nagad number';
+                                break;
+                        }
+                    }
+                }
+            });
+        });
+        
+        // POS: Payment details input
+        const paymentDetailsInput = document.getElementById('input-payment-details');
+        if (paymentDetailsInput) {
+            paymentDetailsInput.addEventListener('input', () => {
+                if (currentSale) {
+                    currentSale.payment_details = paymentDetailsInput.value;
+                }
+            });
+        }
+
         // POS: sale controls
         if (getElement('btn-new-sale')) {
             getElement('btn-new-sale').addEventListener('click', handleNewSaleClick);

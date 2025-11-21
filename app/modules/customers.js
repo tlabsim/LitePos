@@ -35,6 +35,22 @@
         console[type === 'error' ? 'error' : 'log'](title + ': ' + (msg || ''));
     }
 
+    /**
+     * Calculate total debt for a customer
+     * @param {string} customerPhone - Customer phone number
+     * @returns {number} Total debt amount
+     */
+    function calculateCustomerDebt(customerPhone) {
+        if (!customerPhone) return 0;
+        const db = _getDb();
+        const sales = db.sales || [];
+        
+        // Find all closed sales for this customer and sum up their debt
+        return sales
+            .filter(s => s.status === 'closed' && s.customer && s.customer.phone === customerPhone)
+            .reduce((total, sale) => total + (sale.debt || 0), 0);
+    }
+
     function renderCustomersTable() {
         const els = _getEls();
         const db = _getDb();
@@ -79,6 +95,18 @@
                 const tdNotes = document.createElement('td');
                 tdNotes.textContent = c.notes || '';
                 tr.appendChild(tdNotes);
+
+                const tdDebt = document.createElement('td');
+                tdDebt.style.textAlign = 'center';
+                const debt = calculateCustomerDebt(c.phone);
+                if (debt > 0) {
+                    tdDebt.textContent = formatMoney(debt);
+                    tdDebt.style.color = 'var(--danger)';
+                    tdDebt.style.fontWeight = '700';
+                } else {
+                    tdDebt.textContent = '—';
+                }
+                tr.appendChild(tdDebt);
 
                 const tdLast = document.createElement('td');
                 if (c.lastSaleAt) {
