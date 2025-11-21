@@ -694,9 +694,10 @@
             'product-search', 'product-table-body', 'product-overlay', 'product-overlay-body', 'toggle-all-products',
             'customer-overlay', 'customer-overlay-body', 'sale-header-total',
             'cart-table-body', 'cart-table-wrapper', 'cart-empty-state', 'cart-count-chip', 'sale-actions-row',
-            'btn-new-sale', 'btn-hold-sale', 'btn-cancel-sale', 'btn-clear-cart',
+            'btn-new-sale', 'btn-hold-sale', 'btn-cancel-sale',
+            'btn-cancel-edit-sale', 'btn-revert-changes', 'btn-finish-editing',
             'open-sales-list',
-            'input-discount', 'discount-percentage', 'input-payment', 'btn-same-as-total',
+            'input-discount', 'discount-percentage', 'discount-type', 'input-payment', 'btn-same-as-total',
             'summary-subtotal', 'summary-total', 'summary-items-count',
             'summary-change', 'summary-sale-status', 'summary-sale-id-value',
             'btn-complete-sale',
@@ -725,7 +726,9 @@
             'product-edit-brand', 'product-edit-supplier',
             'product-edit-buy', 'product-edit-sell',
             'product-edit-stock', 'product-edit-low',
+            'product-edit-discount', 'product-edit-discount-type', 'product-edit-discount-until',
             'product-filter-category', 'product-filter-brand', 'product-filter-supplier',
+            'product-filter-discount',
             'btn-save-product', 'btn-new-product',
 
             // Sales tab
@@ -1079,9 +1082,29 @@
         if (getElement('input-discount')) {
             getElement('input-discount').addEventListener('input', () => {
                 if (!currentSale) return;
-                currentSale.discount = parseMoneyInput(getElement('input-discount').value);
-                clampDiscount();
-                updateSaleTotals();
+                currentSale.manualDiscount = parseMoneyInput(getElement('input-discount').value);
+                if (window.LitePos?.pos?.updateSaleTotals) {
+                    window.LitePos.state.currentSale = currentSale;
+                    window.LitePos.pos.updateSaleTotals();
+                    currentSale = window.LitePos.state.currentSale;
+                } else {
+                    updateSaleTotals();
+                }
+            });
+        }
+        
+        // Discount type selector
+        if (getElement('discount-type')) {
+            getElement('discount-type').addEventListener('change', () => {
+                if (!currentSale) return;
+                currentSale.manualDiscountType = getElement('discount-type').value;
+                if (window.LitePos?.pos?.updateSaleTotals) {
+                    window.LitePos.state.currentSale = currentSale;
+                    window.LitePos.pos.updateSaleTotals();
+                    currentSale = window.LitePos.state.currentSale;
+                } else {
+                    updateSaleTotals();
+                }
             });
         }
         if (getElement('input-payment')) {
@@ -1331,6 +1354,10 @@
         if (getElement('btn-clear-cart')) {
             getElement('btn-clear-cart').addEventListener('click', clearCart);
         }
+        // Finish editing sale
+        if (getElement('btn-finish-editing')) {
+            getElement('btn-finish-editing').addEventListener('click', finishEditingSale);
+        }
         if (getElement('btn-complete-sale')) {
             getElement('btn-complete-sale').addEventListener('click', completeCurrentSale);
         }
@@ -1407,6 +1434,12 @@
         }
         if (getElement('product-filter-low-stock')) {
             getElement('product-filter-low-stock').addEventListener('change', () => {
+                currentProductsPage = 1;
+                renderProductsTable();
+            });
+        }
+        if (getElement('product-filter-discount')) {
+            getElement('product-filter-discount').addEventListener('change', () => {
                 currentProductsPage = 1;
                 renderProductsTable();
             });
@@ -1823,6 +1856,19 @@
             return;
         }
         console.error('clearCart: pos module not loaded');
+    }
+
+    function finishEditingSale() {
+        if (window.LitePos?.pos?.finishEditingSale) {
+            if (window.LitePos.state) {
+                window.LitePos.state.currentSale = currentSale;
+                window.LitePos.state.db = db;
+            }
+            window.LitePos.pos.finishEditingSale();
+            if (window.LitePos.state?.currentSale) currentSale = window.LitePos.state.currentSale;
+            return;
+        }
+        console.error('finishEditingSale: pos module not loaded');
     }
 
     function clampDiscount() {

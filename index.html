@@ -215,10 +215,11 @@
                                 <table>
                                     <thead>
                                     <tr>
-                                        <th style="width: 38%;">Item</th>
-                                        <th style="max-width: 20%;">Barcode/SKU</th>
+                                        <th style="width: 30%;">Item</th>
+                                        <th style="max-width: 18%;">Barcode/SKU</th>
                                         <th>Qty</th>
                                         <th>Price</th>
+                                        <th>Disc.</th>
                                         <th>Total</th>
                                         <th></th>
                                     </tr>
@@ -398,15 +399,30 @@
                                 <div id="summary-subtotal" class="payment-value money">৳ 0.00</div>
                             </div>
 
-                            <!-- Discount input -->
-                            <div class="payment-row">
-                                <label class="payment-label" for="input-discount">Discount (৳) · ছাড়
-                                    <span id="discount-percentage" class="payment-value" style="font-size: 15px; color: var(--accent-alt); margin-left: 12px; min-width: 50px; text-align: right;">0%</span>
-                                </label>
-                                 
-                                <div style="display: flex; gap: 8px; align-items: center;">
+                            <!-- Discount section -->
+                            <div class="payment-row" style="flex-direction: column; gap: 8px; align-items: stretch;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label class="payment-label">Discount · ছাড়
+                                        <span id="discount-percentage" class="payment-value" style="font-size: 15px; color: var(--accent-alt); margin-left: 12px; min-width: 50px; text-align: right;">0%</span>
+                                    </label>
+                                    <div id="summary-discount" class="payment-value money">৳ 0.00</div>
+                                </div>
+                                
+                                <!-- Product-level discounts (read-only) -->
+                                <div id="product-discount-row" style="display: none; padding-left: 12px; font-size: 14px; color: var(--text-secondary);">
+                                    <span>Product discounts: </span>
+                                    <span id="product-discount-value" class="money">৳ 0.00</span>
+                                </div>
+                                
+                                <!-- Manual discount input -->
+                                <div style="display: flex; gap: 8px; align-items: center; padding-left: 12px;">
+                                    <label style="font-size: 14px; color: var(--text-secondary); white-space: nowrap;">Manual:</label>
                                     <input id="input-discount" type="number" class="payment-input-clean"
-                                        value="0" min="0" step="1" style="flex: 1;">                                   
+                                        value="0" min="0" step="1" style="flex: 1;">
+                                    <select id="discount-type" class="field-input field-input-sm" style="width: 80px;">
+                                        <option value="amount">৳</option>
+                                        <option value="percentage">%</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -499,6 +515,7 @@
                                     <span class="btn-label-bn"><span class="btn-text-main">বিক্রয় সম্পন্ন করুন</span> (Alt+C)</span>
                                 </span>
                             </button>
+                            <!-- Clear Cart button - replaced with Finish Editing when editing sale
                             <button id="btn-clear-cart" class="btn btn-bilingual btn-ghost btn-xl" type="button">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
                                   <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -506,6 +523,16 @@
                                 <span class="btn-labels">
                                     <span class="btn-label-en">Clear cart</span>
                                     <span class="btn-label-bn">কার্ট খালি করুন</span>
+                                </span>
+                            </button>
+                            -->
+                            <button id="btn-finish-editing" class="btn btn-bilingual btn-ghost btn-xl" type="button" style="display: none;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="btn-icon">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span class="btn-labels">
+                                    <span class="btn-label-en">Finish Editing</span>
+                                    <span class="btn-label-bn">সম্পাদনা শেষ করুন</span>
                                 </span>
                             </button>
                         </div>
@@ -597,7 +624,8 @@
                     <div><span>Discount</span><span id="receipt-discount"></span></div>
                     <div><span>Total</span><span id="receipt-total"></span></div>
                     <div><span>Payment</span><span id="receipt-payment"></span></div>
-                    <div><span>Change</span><span id="receipt-change"></span></div>
+                    <div id="receipt-change-row"><span>Change</span><span id="receipt-change"></span></div>
+                    <div id="receipt-due-row" style="display: none;"><span>Due</span><span id="receipt-due"></span></div>
                 </div>
                 <p class="receipt-note">ধন্যবাদ! আবার আসবেন।</p>
             </div>
@@ -629,7 +657,8 @@
                     <div><span>Discount</span><span id="receipt-discount-compact"></span></div>
                     <div style="font-weight: bold; font-size: 12px;"><span>Total</span><span id="receipt-total-compact"></span></div>
                     <div><span>Payment</span><span id="receipt-payment-compact"></span></div>
-                    <div><span>Change</span><span id="receipt-change-compact"></span></div>
+                    <div id="receipt-change-row-compact"><span>Change</span><span id="receipt-change-compact"></span></div>
+                    <div id="receipt-due-row-compact" style="display: none;"><span>Due</span><span id="receipt-due-compact"></span></div>
                 </div>
                 <p class="receipt-note" style="font-size: 10px; margin-top: 8px;">ধন্যবাদ! আবার আসবেন।</p>
             </div>
@@ -777,6 +806,14 @@
                                     <input id="product-filter-low-stock" type="checkbox" style="cursor: pointer;">
                                     <span>Low stock</span>
                                 </label>
+                                <div class="field" style="min-width: 180px;">
+                                    <select id="product-filter-discount" class="field-input field-input-sm">
+                                        <option value="all">All products</option>
+                                        <option value="no-discount">No discount</option>
+                                        <option value="active-discount">Active discount</option>
+                                        <option value="inactive-discount">Inactive discount</option>
+                                    </select>
+                                </div>
                             </div>
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <span id="product-total-count" style="font-size: 14px; color: var(--text-soft); font-weight: 500;">0 total | Showing page 1 of 1</span>
@@ -791,11 +828,9 @@
                                     <tr>
                                         <th style="width: 60px;">ID</th>
                                         <th style="width: 18%;">Name</th>
-                                        <th>SKU</th>
-                                        <th style="width: 120px;">Barcode</th>
+                                        <th>SKU / Barcode</th>
                                         <th>Category</th>
-                                        <th>Brand</th>
-                                        <th>Supplier</th>
+                                        <th>Brand / Supplier</th>
                                         <th>Buy (৳)</th>
                                         <th>Sell (৳)</th>
                                         <th>Stock</th>
@@ -898,7 +933,30 @@
                                 <input id="product-edit-sell" type="number" class="field-input" min="0" step="1">
                             </div>
                         </div>
-                        <div class="two-col">
+                        
+                        <!-- Discount Section -->
+                        <div class="card-body" style="background: var(--background-soft); border-radius: 8px; padding: 16px; margin-top: 16px;">
+                            <h3 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 600;">Discount <span style="font-weight: 400; color: var(--text-soft);">(optional)</span></h3>
+                            <div class="two-col">
+                                <div class="field">
+                                    <label class="field-label">Discount Value</label>
+                                    <input id="product-edit-discount" type="number" class="field-input" min="0" step="0.01" placeholder="0">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label">Discount Type</label>
+                                    <select id="product-edit-discount-type" class="field-input">
+                                        <option value="amount">৳ Amount</option>
+                                        <option value="percentage">% Percentage</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="field-label">Discount Valid Until <span style="font-weight: 400; font-size: 12px; color: var(--text-soft);">(optional)</span></label>
+                                <input id="product-edit-discount-until" type="date" class="field-input" placeholder="Leave empty for no expiry">
+                            </div>
+                        </div>
+                        
+                        <div class="two-col" style="margin-top: 16px;">
                             <div class="field">
                                 <label class="field-label">Stock</label>
                                 <input id="product-edit-stock" type="number" class="field-input" min="0" step="1">

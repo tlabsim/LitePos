@@ -240,11 +240,54 @@
 
     ns.pos.updateSaleTotals = function () {
         if (!ns.state.currentSale) return;
+        
+        // Calculate subtotal (sum of qty * price for all items)
         let subtotal = 0;
-        ns.state.currentSale.items.forEach(it => { subtotal += it.qty * it.price; });
+        ns.state.currentSale.items.forEach(it => { 
+            subtotal += it.qty * it.price; 
+        });
         ns.state.currentSale.subtotal = subtotal;
-        ns.pos.clampDiscount();
-        ns.state.currentSale.total = Math.max(0, subtotal - (ns.state.currentSale.discount || 0));
+        
+        // Calculate total product discounts
+        let productDiscountTotal = 0;
+        ns.state.currentSale.items.forEach(it => {
+            const itemTotal = it.qty * it.price;
+            if (it.discount && it.discount > 0) {
+                if (it.discountType === 'percentage') {
+                    productDiscountTotal += (itemTotal * it.discount / 100);
+                } else {
+                    productDiscountTotal += (it.discount * it.qty); // Amount discount per item
+                }
+            }
+        });
+        ns.state.currentSale.productDiscount = productDiscountTotal;
+        
+        // Manual discount (can be amount or percentage)
+        // Store manual discount separately
+        if (!ns.state.currentSale.manualDiscount) ns.state.currentSale.manualDiscount = 0;
+        if (!ns.state.currentSale.manualDiscountType) ns.state.currentSale.manualDiscountType = 'amount';
+        
+        let manualDiscountAmount = 0;
+        if (ns.state.currentSale.manualDiscount > 0) {
+            if (ns.state.currentSale.manualDiscountType === 'percentage') {
+                manualDiscountAmount = (subtotal - productDiscountTotal) * ns.state.currentSale.manualDiscount / 100;
+            } else {
+                manualDiscountAmount = ns.state.currentSale.manualDiscount;
+            }
+        }
+        
+        // Total discount = product discounts + manual discount
+        ns.state.currentSale.discount = productDiscountTotal + manualDiscountAmount;
+        
+        // Clamp manual discount to not exceed (subtotal - productDiscount)
+        const maxManualDiscount = subtotal - productDiscountTotal;
+        if (ns.state.currentSale.manualDiscountType === 'amount' && ns.state.currentSale.manualDiscount > maxManualDiscount) {
+            ns.state.currentSale.manualDiscount = maxManualDiscount;
+            ns.state.currentSale.discount = productDiscountTotal + maxManualDiscount;
+        }
+        
+        // Final total
+        ns.state.currentSale.total = Math.max(0, subtotal - ns.state.currentSale.discount);
         
         const payment = ns.state.currentSale.payment || 0;
         const total = ns.state.currentSale.total;
@@ -280,11 +323,26 @@
 
         const els = ns.elements || {};
         const formatMoney = (v) => ns.utils && ns.utils.formatMoney ? ns.utils.formatMoney(v) : ('৳ ' + Number(v || 0).toFixed(2));
+        
+        // Update summary displays
         if (_getEl('summary-subtotal')) _getEl('summary-subtotal').textContent = formatMoney(subtotal);
         if (_getEl('summary-total')) _getEl('summary-total').textContent = formatMoney(ns.state.currentSale.total);
         if (_getEl('sale-header-total')) _getEl('sale-header-total').textContent = formatMoney(ns.state.currentSale.total);
         if (_getEl('summary-items-count')) _getEl('summary-items-count').textContent = String(ns.state.currentSale.items.reduce((s, it) => s + it.qty, 0));
         if (_getEl('summary-change')) _getEl('summary-change').textContent = formatMoney(ns.state.currentSale.change);
+        if (_getEl('summary-discount')) _getEl('summary-discount').textContent = formatMoney(ns.state.currentSale.discount);
+        
+        // Show product discount breakdown if there are product discounts
+        const productDiscountRow = document.getElementById('product-discount-row');
+        const productDiscountValue = document.getElementById('product-discount-value');
+        if (productDiscountRow && productDiscountValue) {
+            if (productDiscountTotal > 0) {
+                productDiscountRow.style.display = '';
+                productDiscountValue.textContent = formatMoney(productDiscountTotal);
+            } else {
+                productDiscountRow.style.display = 'none';
+            }
+        }
         
         // Show/hide Change and Due rows (exclusive)
         const changeRow = document.getElementById('payment-row-change');
@@ -319,10 +377,20 @@
         // Only update input fields if user is not actively editing them
         try {
             const active = document.activeElement;
-            if (_getEl('input-discount') && active !== _getEl('input-discount')) _getEl('input-discount').value = ns.state.currentSale.discount || 0;
-            if (_getEl('input-payment') && active !== _getEl('input-payment')) _getEl('input-payment').value = ns.state.currentSale.payment || 0;
+            // Update manual discount input (not total discount)
+            if (_getEl('input-discount') && active !== _getEl('input-discount')) {
+                _getEl('input-discount').value = ns.state.currentSale.manualDiscount || 0;
+            }
+            // Update discount type selector
+            if (_getEl('discount-type') && active !== _getEl('discount-type')) {
+                _getEl('discount-type').value = ns.state.currentSale.manualDiscountType || 'amount';
+            }
+            if (_getEl('input-payment') && active !== _getEl('input-payment')) {
+                _getEl('input-payment').value = ns.state.currentSale.payment || 0;
+            }
         } catch (e) {
-            if (_getEl('input-discount')) _getEl('input-discount').value = ns.state.currentSale.discount || 0;
+            if (_getEl('input-discount')) _getEl('input-discount').value = ns.state.currentSale.manualDiscount || 0;
+            if (_getEl('discount-type')) _getEl('discount-type').value = ns.state.currentSale.manualDiscountType || 'amount';
             if (_getEl('input-payment')) _getEl('input-payment').value = ns.state.currentSale.payment || 0;
         }
     };
@@ -354,22 +422,96 @@
         }
         console.log('[renderCartTable] Rendering', ns.state.currentSale.items.length, 'items');
 
+        const formatMoney = (v) => ns.utils && ns.utils.formatMoney ? ns.utils.formatMoney(v) : ('৳ ' + Number(v || 0).toFixed(2));
+
         ns.state.currentSale.items.forEach((item, index) => {
             const tr = document.createElement('tr'); tr.classList.add('cart-item-row');
-            const tdName = document.createElement('td'); tdName.classList.add('cart-item-name'); tdName.textContent = item.name; tr.appendChild(tdName);
+            
+            // Item name
+            const tdName = document.createElement('td'); 
+            tdName.classList.add('cart-item-name'); 
+            tdName.textContent = item.name; 
+            tr.appendChild(tdName);
+            
+            // Barcode/SKU
             const tdBarcodeSKU = document.createElement('td');
             tdBarcodeSKU.classList.add('cart-item-barcode-sku');
             tdBarcodeSKU.textContent = item.barcode || item.sku || '';
             tr.appendChild(tdBarcodeSKU);
+            
+            // Quantity controls
             const tdQty = document.createElement('td');
-            const qtyControls = document.createElement('div'); qtyControls.style.display = 'flex'; qtyControls.style.alignItems = 'center'; qtyControls.style.gap = '4px';
-            const btnMinus = document.createElement('button'); btnMinus.type='button'; btnMinus.className='btn btn-ghost btn-lg'; btnMinus.textContent='−'; btnMinus.style.padding='2px 8px'; btnMinus.addEventListener('click', () => ns.pos.changeCartQty(index, -1));
-            const spanQty = document.createElement('span'); spanQty.textContent = String(item.qty); spanQty.style.minWidth='18px'; spanQty.style.textAlign='center';
-            const btnPlus = document.createElement('button'); btnPlus.type='button'; btnPlus.className='btn btn-ghost btn-lg'; btnPlus.textContent='+'; btnPlus.style.padding='2px 8px'; btnPlus.addEventListener('click', () => ns.pos.changeCartQty(index, 1));
-            qtyControls.appendChild(btnMinus); qtyControls.appendChild(spanQty); qtyControls.appendChild(btnPlus); tdQty.appendChild(qtyControls); tr.appendChild(tdQty);
-            const tdPrice = document.createElement('td'); tdPrice.textContent = ns.utils ? ns.utils.formatMoney(item.price) : ('৳ ' + item.price.toFixed(2)); tr.appendChild(tdPrice);
-            const tdTotal = document.createElement('td'); tdTotal.textContent = ns.utils ? ns.utils.formatMoney(item.qty * item.price) : ('৳ ' + (item.qty * item.price).toFixed(2)); tr.appendChild(tdTotal);
-            const tdActions = document.createElement('td'); tdActions.classList.add("row-right"); const btnRemove = document.createElement('button'); btnRemove.type='button'; btnRemove.className='btn btn-ghost btn-lg'; btnRemove.textContent='✕'; btnRemove.addEventListener('click', () => ns.pos.removeCartItem(index)); tdActions.appendChild(btnRemove); tr.appendChild(tdActions);
+            const qtyControls = document.createElement('div'); 
+            qtyControls.style.display = 'flex'; 
+            qtyControls.style.alignItems = 'center'; 
+            qtyControls.style.gap = '4px';
+            const btnMinus = document.createElement('button'); 
+            btnMinus.type='button'; 
+            btnMinus.className='btn btn-ghost btn-lg'; 
+            btnMinus.textContent='−'; 
+            btnMinus.style.padding='2px 8px'; 
+            btnMinus.addEventListener('click', () => ns.pos.changeCartQty(index, -1));
+            const spanQty = document.createElement('span'); 
+            spanQty.textContent = String(item.qty); 
+            spanQty.style.minWidth='18px'; 
+            spanQty.style.textAlign='center';
+            const btnPlus = document.createElement('button'); 
+            btnPlus.type='button'; 
+            btnPlus.className='btn btn-ghost btn-lg'; 
+            btnPlus.textContent='+'; 
+            btnPlus.style.padding='2px 8px'; 
+            btnPlus.addEventListener('click', () => ns.pos.changeCartQty(index, 1));
+            qtyControls.appendChild(btnMinus); 
+            qtyControls.appendChild(spanQty); 
+            qtyControls.appendChild(btnPlus); 
+            tdQty.appendChild(qtyControls); 
+            tr.appendChild(tdQty);
+            
+            // Price
+            const tdPrice = document.createElement('td'); 
+            tdPrice.textContent = formatMoney(item.price); 
+            tr.appendChild(tdPrice);
+            
+            // Discount
+            const tdDiscount = document.createElement('td');
+            tdDiscount.style.fontSize = '13px';
+            tdDiscount.style.color = 'var(--accent)';
+            if (item.discount && item.discount > 0) {
+                if (item.discountType === 'percentage') {
+                    tdDiscount.textContent = item.discount + '%';
+                } else {
+                    tdDiscount.textContent = formatMoney(item.discount);
+                }
+            } else {
+                tdDiscount.textContent = '—';
+            }
+            tr.appendChild(tdDiscount);
+            
+            // Total (after discount)
+            const tdTotal = document.createElement('td');
+            const itemTotal = item.qty * item.price;
+            let itemDiscount = 0;
+            if (item.discount && item.discount > 0) {
+                if (item.discountType === 'percentage') {
+                    itemDiscount = itemTotal * item.discount / 100;
+                } else {
+                    itemDiscount = item.discount * item.qty;
+                }
+            }
+            tdTotal.textContent = formatMoney(itemTotal - itemDiscount);
+            tr.appendChild(tdTotal);
+            
+            // Remove button
+            const tdActions = document.createElement('td'); 
+            tdActions.classList.add("row-right"); 
+            const btnRemove = document.createElement('button'); 
+            btnRemove.type='button'; 
+            btnRemove.className='btn btn-ghost btn-lg'; 
+            btnRemove.textContent='✕'; 
+            btnRemove.addEventListener('click', () => ns.pos.removeCartItem(index)); 
+            tdActions.appendChild(btnRemove); 
+            tr.appendChild(tdActions);
+            
             tbody.appendChild(tr);
         });
 
@@ -497,6 +639,28 @@
                 existing.sku = usedSku;
             }
         } else {
+            // Check if discount is active
+            let activeDiscount = 0;
+            let activeDiscountType = 'amount';
+            if (product.discount && product.discount > 0) {
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                
+                if (!product.discountUntil) {
+                    // No expiry, discount is active
+                    activeDiscount = product.discount;
+                    activeDiscountType = product.discountType || 'amount';
+                } else {
+                    const expiry = new Date(product.discountUntil);
+                    expiry.setHours(0, 0, 0, 0);
+                    if (expiry >= now) {
+                        // Discount still valid
+                        activeDiscount = product.discount;
+                        activeDiscountType = product.discountType || 'amount';
+                    }
+                }
+            }
+            
             ns.state.currentSale.items.push({
                 productId: product.id,
                 sku: usedSku,
@@ -504,7 +668,9 @@
                 name: product.name,
                 qty: 1,
                 price: product.sellPrice,
-                buyPrice: product.buyPrice
+                buyPrice: product.buyPrice,
+                discount: activeDiscount,
+                discountType: activeDiscountType
             });
         }
         ns.pos.renderCartTable();
@@ -956,9 +1122,26 @@
         }
         if (ns.api && typeof ns.api.saveDb === 'function') ns.api.saveDb(); else localStorage.setItem(ns.api && ns.api.DB_KEY ? ns.api.DB_KEY : 'litepos_bdt_db_v1', JSON.stringify(ns.state.db));
         ns.state.lastClosedSaleId = ns.state.currentSale.id;
+        
+        // Fill receipt with updated sale data
+        if (ns.pos.fillReceiptFromSale) ns.pos.fillReceiptFromSale(saleCopy);
+        
+        // If editing an existing sale, just update and don't clear UI
+        if (wasEditing) {
+            if (ns.elements && ns.elements['summary-sale-status']) ns.elements['summary-sale-status'].textContent = `Closed · ${ns.state.currentSale.id}`;
+            if (ns.ui) ns.ui.showToast('Sale updated', `Sale ${ns.state.currentSale.id} has been updated successfully.`, 'success');
+            
+            // Refresh views but don't clear cart
+            if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip();
+            if (ns.pos.refreshKpis) ns.pos.refreshKpis();
+            if (ns.pos.renderSalesTable) ns.pos.renderSalesTable();
+            if (ns.pos.renderTodaySnapshot) ns.pos.renderTodaySnapshot();
+            return; // Don't clear cart when editing
+        }
+        
+        // For new sales, complete normally and clear everything
         if (ns.elements && ns.elements['summary-sale-status']) ns.elements['summary-sale-status'].textContent = `Closed · ${ns.state.currentSale.id}`;
         if (ns.ui) ns.ui.showToast('Sale completed', `Sale ${ns.state.currentSale.id} closed.`, 'success');
-        if (ns.pos.fillReceiptFromSale) ns.pos.fillReceiptFromSale && ns.pos.fillReceiptFromSale(saleCopy);
         
         // CRITICAL: Clear auto-save BEFORE starting new sale to prevent race condition
         if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
@@ -973,6 +1156,30 @@
         if (ns.pos.renderCartTable) ns.pos.renderCartTable(); if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip(); if (ns.pos.renderProductsTable) ns.pos.renderProductsTable && ns.pos.renderProductsTable(); if (ns.pos.renderCustomersTable) ns.pos.renderCustomersTable && ns.pos.renderCustomersTable();
         if (ns.pos.refreshKpis) ns.pos.refreshKpis && ns.pos.refreshKpis(); if (ns.pos.renderSalesTable) ns.pos.renderSalesTable && ns.pos.renderSalesTable(); 
         if (ns.pos.renderTodaySnapshot) ns.pos.renderTodaySnapshot && ns.pos.renderTodaySnapshot();
+    };
+
+    // Finish editing sale - clear cart and start new sale
+    ns.pos.finishEditingSale = function () {
+        if (!ns.state.currentSale || !ns.state.currentSale.id) {
+            if (ns.ui) ns.ui.showToast('No active sale', 'No sale is currently being edited.', 'info');
+            return;
+        }
+        
+        // Clear auto-save
+        if (ns.pos.clearAutoSave) ns.pos.clearAutoSave();
+        
+        // Clear original sale items tracking
+        ns.state.originalSaleItems = null;
+        
+        // Start new sale and clear everything
+        ns.pos.startNewSale(true);
+        
+        // Refresh all views
+        if (ns.pos.renderCartTable) ns.pos.renderCartTable();
+        if (ns.pos.renderOpenSalesStrip) ns.pos.renderOpenSalesStrip();
+        if (ns.pos.updateActionButtonsVisibility) ns.pos.updateActionButtonsVisibility();
+        
+        if (ns.ui) ns.ui.showToast('Editing finished', 'Started a new sale.', 'success');
     };
 
     // Fill receipt with sale data
@@ -1069,7 +1276,22 @@
         if (_getEl('receipt-discount' + suffix)) _getEl('receipt-discount' + suffix).textContent = formatMoney(sale.discount || 0);
         if (_getEl('receipt-total' + suffix)) _getEl('receipt-total' + suffix).textContent = formatMoney(sale.total || 0);
         if (_getEl('receipt-payment' + suffix)) _getEl('receipt-payment' + suffix).textContent = formatMoney(sale.payment || 0);
-        if (_getEl('receipt-change' + suffix)) _getEl('receipt-change' + suffix).textContent = formatMoney(sale.change || 0);
+        
+        // Show/hide Change and Due rows based on whether there's debt
+        const changeRow = document.getElementById('receipt-change-row' + suffix);
+        const dueRow = document.getElementById('receipt-due-row' + suffix);
+        
+        if (sale.debt && sale.debt > 0) {
+            // Show Due, hide Change
+            if (_getEl('receipt-due' + suffix)) _getEl('receipt-due' + suffix).textContent = formatMoney(sale.debt);
+            if (dueRow) dueRow.style.display = '';
+            if (changeRow) changeRow.style.display = 'none';
+        } else {
+            // Show Change, hide Due
+            if (_getEl('receipt-change' + suffix)) _getEl('receipt-change' + suffix).textContent = formatMoney(sale.change || 0);
+            if (changeRow) changeRow.style.display = '';
+            if (dueRow) dueRow.style.display = 'none';
+        }
         
         console.log('[fillReceiptFromSale] Receipt filled successfully');
     };

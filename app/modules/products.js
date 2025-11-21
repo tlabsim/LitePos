@@ -131,6 +131,36 @@
             filtered = filtered.filter(p => p.stock <= (p.lowStockAt || 0));
         }
         
+        // Apply discount filter
+        const discountFilter = _getEl('product-filter-discount') ? _getEl('product-filter-discount').value : 'all';
+        if (discountFilter !== 'all') {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0); // Start of today
+            
+            filtered = filtered.filter(p => {
+                const hasDiscount = p.discount && p.discount > 0;
+                
+                if (discountFilter === 'no-discount') {
+                    return !hasDiscount;
+                } else if (discountFilter === 'active-discount') {
+                    if (!hasDiscount) return false;
+                    // Has discount and either no expiry or expiry is today or later
+                    if (!p.discountUntil) return true;
+                    const expiry = new Date(p.discountUntil);
+                    expiry.setHours(0, 0, 0, 0);
+                    return expiry >= now;
+                } else if (discountFilter === 'inactive-discount') {
+                    if (!hasDiscount) return false;
+                    // Has discount but expired
+                    if (!p.discountUntil) return false;
+                    const expiry = new Date(p.discountUntil);
+                    expiry.setHours(0, 0, 0, 0);
+                    return expiry < now;
+                }
+                return true;
+            });
+        }
+        
         // Apply sorting
         const [sortField, sortDir] = sortBy.split('-');
         filtered.sort((a, b) => {
@@ -202,38 +232,87 @@
             tdName.style.fontWeight = '600';
             tr.appendChild(tdName);
             
-            const tdSku = document.createElement('td'); 
-            tdSku.textContent = p.sku; 
-            tr.appendChild(tdSku);
-            
-            const tdBarcode = document.createElement('td'); 
-            tdBarcode.className = 'barcode-cell';
-            tdBarcode.textContent = p.barcode || '—'; 
-            tdBarcode.style.fontSize = '12px'; 
-            tdBarcode.title = p.barcode || ''; // Show full barcode on hover
-            tr.appendChild(tdBarcode);
+            // SKU / Barcode (two lines)
+            const tdSkuBarcode = document.createElement('td'); 
+            tdSkuBarcode.style.fontSize = '12px'; 
+            tdSkuBarcode.style.lineHeight = '1.4';
+            const skuDiv = document.createElement('div');
+            skuDiv.textContent = p.sku;
+            skuDiv.style.fontWeight = '500';
+            const barcodeDiv = document.createElement('div');
+            barcodeDiv.textContent = p.barcode || '—';
+            barcodeDiv.style.color = 'var(--text-soft)';
+            barcodeDiv.style.fontSize = '11px';
+            barcodeDiv.className = 'barcode-cell';
+            barcodeDiv.title = p.barcode || '';
+            tdSkuBarcode.appendChild(skuDiv);
+            tdSkuBarcode.appendChild(barcodeDiv);
+            tr.appendChild(tdSkuBarcode);
             
             const tdCategory = document.createElement('td'); 
             tdCategory.textContent = p.category || '—'; 
             tdCategory.style.fontSize = '12px'; 
             tr.appendChild(tdCategory);
             
-            const tdBrand = document.createElement('td'); 
-            tdBrand.textContent = p.brand || '—'; 
-            tdBrand.style.fontSize = '12px'; 
-            tr.appendChild(tdBrand);
-            
-            const tdSupplier = document.createElement('td'); 
-            tdSupplier.textContent = p.supplier || '—'; 
-            tdSupplier.style.fontSize = '12px'; 
-            tr.appendChild(tdSupplier);
+            // Brand / Supplier (two lines)
+            const tdBrandSupplier = document.createElement('td'); 
+            tdBrandSupplier.style.fontSize = '12px';
+            tdBrandSupplier.style.lineHeight = '1.4';
+            const brandDiv = document.createElement('div');
+            brandDiv.textContent = p.brand || '—';
+            brandDiv.style.fontWeight = '500';
+            const supplierDiv = document.createElement('div');
+            supplierDiv.textContent = p.supplier || '—';
+            supplierDiv.style.color = 'var(--text-soft)';
+            supplierDiv.style.fontSize = '11px';
+            tdBrandSupplier.appendChild(brandDiv);
+            tdBrandSupplier.appendChild(supplierDiv);
+            tr.appendChild(tdBrandSupplier);
             
             const tdBuy = document.createElement('td'); 
             tdBuy.textContent = formatMoney(p.buyPrice); 
             tr.appendChild(tdBuy);
             
-            const tdSell = document.createElement('td'); 
-            tdSell.textContent = formatMoney(p.sellPrice); 
+            // Sell Price with discount info (two lines)
+            const tdSell = document.createElement('td');
+            tdSell.style.lineHeight = '1.4';
+            const priceDiv = document.createElement('div');
+            priceDiv.textContent = formatMoney(p.sellPrice);
+            priceDiv.style.fontWeight = '500';
+            tdSell.appendChild(priceDiv);
+            
+            // Check if discount is active
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            let discountActive = false;
+            if (p.discount && p.discount > 0) {
+                if (!p.discountUntil) {
+                    discountActive = true;
+                } else {
+                    const expiry = new Date(p.discountUntil);
+                    expiry.setHours(0, 0, 0, 0);
+                    discountActive = expiry >= now;
+                }
+            }
+            
+            if (discountActive) {
+                const discDiv = document.createElement('div');
+                discDiv.style.fontSize = '11px';
+                discDiv.style.fontWeight = '500';
+                discDiv.style.color = 'var(--success)';
+                const discType = p.discountType === 'percentage' ? '%' : '৳';
+                discDiv.textContent = `-${p.discount}${discType} discount`;
+                tdSell.appendChild(discDiv);
+            } else if (p.discount && p.discount > 0 && p.discountUntil) {
+                // Expired discount
+                const discDiv = document.createElement('div');
+                discDiv.style.fontSize = '11px';
+                discDiv.style.color = 'var(--text-soft)';
+                discDiv.style.textDecoration = 'line-through';
+                const discType = p.discountType === 'percentage' ? '%' : '৳';
+                discDiv.textContent = `-${p.discount}${discType} expired`;
+                tdSell.appendChild(discDiv);
+            }
             tr.appendChild(tdSell);
             
             const tdStock = document.createElement('td'); 
@@ -432,7 +511,7 @@
                         overlayInner.innerHTML = `
                             <table>
                                 <thead>
-                                    <tr><th>Product</th><th>SKU</th><th>Barcode</th><th>Category</th><th>Sell</th><th>Stock</th><th></th></tr>
+                                    <tr><th>Product</th><th>SKU</th><th>Barcode</th><th>Category</th><th>Sell</th><th>Disc.</th><th>Stock</th><th></th></tr>
                                 </thead>
                                 <tbody id="product-overlay-body"></tbody>
                             </table>
@@ -471,6 +550,22 @@
             tr.appendChild(tdBarcode);
             const tdCategory = document.createElement('td'); tdCategory.textContent = p.category || '—'; tdCategory.style.fontSize = '12px'; tr.appendChild(tdCategory);
             const tdSell = document.createElement('td'); tdSell.textContent = formatMoney(p.sellPrice); tr.appendChild(tdSell);
+            
+            // Discount column
+            const tdDiscount = document.createElement('td');
+            tdDiscount.style.fontSize = '12px';
+            tdDiscount.style.color = 'var(--accent)';
+            if (p.discount && p.discount > 0) {
+                if (p.discountType === 'percentage') {
+                    tdDiscount.textContent = p.discount + '%';
+                } else {
+                    tdDiscount.textContent = formatMoney(p.discount);
+                }
+            } else {
+                tdDiscount.textContent = '—';
+            }
+            tr.appendChild(tdDiscount);
+            
             const tdStock = document.createElement('td'); tdStock.textContent = String(p.stock); if (p.stock <= (p.lowStockAt || 0)) tdStock.style.color = '#facc15'; tr.appendChild(tdStock);
 
             const tdBtn = document.createElement('td');
@@ -612,6 +707,14 @@
         if (_getEl('product-edit-sell')) _getEl('product-edit-sell').value = p.sellPrice;
         if (_getEl('product-edit-stock')) _getEl('product-edit-stock').value = p.stock;
         if (_getEl('product-edit-low')) _getEl('product-edit-low').value = p.lowStockAt || 0;
+        
+        // Load discount fields
+        if (_getEl('product-edit-discount')) _getEl('product-edit-discount').value = p.discount || 0;
+        if (_getEl('product-edit-discount-type')) _getEl('product-edit-discount-type').value = p.discountType || 'amount';
+        if (_getEl('product-edit-discount-until')) {
+            _getEl('product-edit-discount-until').value = p.discountUntil || '';
+        }
+        
         if (_getEl('product-edit-name')) _getEl('product-edit-name').dataset.productId = p.id;
         
         // Disable stock input for existing products
@@ -825,6 +928,12 @@
         if (_getEl('product-edit-sell')) _getEl('product-edit-sell').value = '';
         if (_getEl('product-edit-stock')) _getEl('product-edit-stock').value = '';
         if (_getEl('product-edit-low')) _getEl('product-edit-low').value = '';
+        
+        // Clear discount fields
+        if (_getEl('product-edit-discount')) _getEl('product-edit-discount').value = '';
+        if (_getEl('product-edit-discount-type')) _getEl('product-edit-discount-type').value = 'amount';
+        if (_getEl('product-edit-discount-until')) _getEl('product-edit-discount-until').value = '';
+        
         if (_getEl('product-edit-name')) delete _getEl('product-edit-name').dataset.productId;
         
         // Hide delete button for new products
@@ -868,6 +977,11 @@
         const sell = (UTILS && typeof UTILS.parseMoneyInput === 'function') ? UTILS.parseMoneyInput(_getEl('product-edit-sell') && _getEl('product-edit-sell').value) : parseFloat(_getEl('product-edit-sell') && _getEl('product-edit-sell').value || '0');
         const stock = parseInt(_getEl('product-edit-stock') && _getEl('product-edit-stock').value || '0', 10);
         const low = parseInt(_getEl('product-edit-low') && _getEl('product-edit-low').value || '0', 10);
+        
+        // Get discount fields
+        const discount = parseFloat(_getEl('product-edit-discount') && _getEl('product-edit-discount').value || '0');
+        const discountType = (_getEl('product-edit-discount-type') && _getEl('product-edit-discount-type').value) || 'amount';
+        const discountUntil = (_getEl('product-edit-discount-until') && _getEl('product-edit-discount-until').value) || null;
 
         // Name is required, SKU is now optional
         if (!name) { return _showToast('Product', 'Product name is required.', 'error'); }
@@ -904,10 +1018,14 @@
             product.category = category; 
             product.brand = brand; 
             product.supplier = supplier; 
-            product.buyPrice = buy; 
-            product.sellPrice = sell; 
-            product.stock = stock; 
+            product.buyPrice = buy;
+            product.sellPrice = sell;
+            product.stock = stock;
             product.lowStockAt = low;
+            product.discount = discount;
+            product.discountType = discountType;
+            product.discountUntil = discountUntil;
+            product.modifiedAt = new Date().toISOString();
         } else {
             // Generate unique ID
             const nextId = db.products.length > 0 ? Math.max(...db.products.map(p => parseInt(p.id.replace('p', '')) || 0)) + 1 : 1;
@@ -921,9 +1039,13 @@
                 supplier, 
                 buyPrice: buy, 
                 sellPrice: sell, 
+                discount: discount,
+                discountType: discountType,
+                discountUntil: discountUntil,
                 stock, 
                 lowStockAt: low, 
-                createdAt: new Date().toISOString() 
+                createdAt: new Date().toISOString(),
+                modifiedAt: new Date().toISOString()
             };
             db.products.push(product);
         }
