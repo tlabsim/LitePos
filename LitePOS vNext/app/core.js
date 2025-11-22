@@ -672,9 +672,8 @@
     function cacheElements() {
         const ids = [
             'login-screen', 'main-screen',
-            'header-shop-name', 'header-shop-address', 'header-shop-phone',
-            'header-logo-img', 'header-logo-text', 'header-logo-container',
-            'header-user-label', 'header-user-role', 'header-session-pill',
+            'sidebar-shop-name', 'sidebar-logo-img', 'sidebar-logo-text',
+            'sidebar-user-name', 'sidebar-user-role', 'sidebar-logout-btn',
             'btn-logout',
 
             // Login / setup
@@ -929,13 +928,13 @@
     }
 
     function loadShopIntoHeader() {
-        getElement('header-shop-name').textContent = db.shop.name || 'LitePOS';
-        getElement('header-shop-address').textContent = db.shop.address || '';
-        getElement('header-shop-phone').textContent = db.shop.phone || '';
+        // Update sidebar elements instead of header
+        const shopNameEl = getElement('sidebar-shop-name');
+        if (shopNameEl) shopNameEl.textContent = db.shop.name || 'LitePOS';
         
-        // Update logo in header
-        const logoImg = getElement('header-logo-img');
-        const logoText = getElement('header-logo-text');
+        // Update logo in sidebar
+        const logoImg = getElement('sidebar-logo-img');
+        const logoText = getElement('sidebar-logo-text');
         if (db.shop && db.shop.logo && logoImg && logoText) {
             logoImg.src = db.shop.logo;
             logoImg.style.display = 'block';
@@ -946,8 +945,10 @@
         }
         
         if (currentUser) {
-            getElement('header-user-label').textContent = currentUser.name;
-            getElement('header-user-role').textContent = currentUser.role === ROLE_SUPERADMIN ? 'Superadmin' : 'Sales';
+            const userNameEl = getElement('sidebar-user-name');
+            const userRoleEl = getElement('sidebar-user-role');
+            if (userNameEl) userNameEl.textContent = currentUser.name;
+            if (userRoleEl) userRoleEl.textContent = currentUser.role === ROLE_SUPERADMIN ? 'Superadmin' : 'Sales';
         } else {
             getElement('header-user-label').textContent = 'Not signed in';
             getElement('header-user-role').textContent = '';

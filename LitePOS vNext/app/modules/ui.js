@@ -20,8 +20,8 @@
     ns.ui.cacheElements = function () {
         const ids = [
             'login-screen', 'main-screen',
-            'header-shop-name', 'header-shop-address', 'header-shop-phone',
-            'header-user-label', 'header-user-role', 'header-session-pill',
+            'sidebar-shop-name', 'sidebar-logo-img', 'sidebar-logo-text',
+            'sidebar-user-name', 'sidebar-user-role', 'sidebar-logout-btn',
             'btn-logout',
             'setup-panel', 'signin-panel',
             'setup-name', 'setup-username', 'setup-pin', 'setup-pin-confirm',
@@ -85,12 +85,21 @@
     ns.ui.loadShopIntoHeader = function () {
         const els = ns.elements || {};
         if (!ns.state.db) return;
-        els['header-shop-name'] && (els['header-shop-name'].textContent = ns.state.db.shop.name || 'LitePOS');
-        els['header-shop-address'] && (els['header-shop-address'].textContent = ns.state.db.shop.address || '');
-        els['header-shop-phone'] && (els['header-shop-phone'].textContent = ns.state.db.shop.phone || '');
+        els['sidebar-shop-name'] && (els['sidebar-shop-name'].textContent = ns.state.db.shop.name || 'LitePOS');
+        
+        // Update sidebar logo
+        if (ns.state.db.shop && ns.state.db.shop.logo) {
+            els['sidebar-logo-img'] && (els['sidebar-logo-img'].src = ns.state.db.shop.logo);
+            els['sidebar-logo-img'] && (els['sidebar-logo-img'].style.display = 'block');
+            els['sidebar-logo-text'] && (els['sidebar-logo-text'].style.display = 'none');
+        } else {
+            els['sidebar-logo-img'] && (els['sidebar-logo-img'].style.display = 'none');
+            els['sidebar-logo-text'] && (els['sidebar-logo-text'].style.display = 'block');
+        }
+        
         if (ns.state.currentUser) {
-            els['header-user-label'] && (els['header-user-label'].textContent = ns.state.currentUser.name);
-            els['header-user-role'] && (els['header-user-role'].textContent = ns.state.currentUser.role === 'superadmin' ? 'Superadmin' : 'Sales');
+            els['sidebar-user-name'] && (els['sidebar-user-name'].textContent = ns.state.currentUser.name);
+            els['sidebar-user-role'] && (els['sidebar-user-role'].textContent = ns.state.currentUser.role === 'superadmin' ? 'Superadmin' : 'Sales');
         }
     };
 

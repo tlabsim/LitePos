@@ -1,0 +1,344 @@
+/* layout.css - App layout structure */
+
+/* ========== App Container ========== */
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    background: var(--bg-secondary);
+}
+
+/* ========== Sidebar ========== */
+.sidebar {
+    width: var(--sidebar-width);
+    height: 100vh;
+    background: var(--bg-primary);
+    border-right: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    transition: width var(--transition-normal);
+    flex-shrink: 0;
+}
+
+.sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.sidebar-logo-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--accent-primary);
+    color: white;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.sidebar-logo-img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.sidebar-logo-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+/* ========== Sidebar Navigation ========== */
+.sidebar-nav {
+    flex: 1;
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.sidebar-nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+    width: 100%;
+}
+
+.sidebar-nav-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.sidebar-nav-item.active {
+    background: var(--accent-light);
+    color: var(--accent-primary);
+}
+
+.sidebar-nav-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.sidebar-nav-label {
+    flex: 1;
+}
+
+/* ========== Sidebar Footer ========== */
+.sidebar-footer {
+    padding: var(--space-md);
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: var(--border-light);
+    margin: var(--space-sm) 0;
+}
+
+.sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    background: var(--bg-hover);
+    margin-bottom: var(--space-sm);
+}
+
+.sidebar-user-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.sidebar-user-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-user-role {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ========== Main Content ========== */
+.main-content {
+    flex: 1;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--bg-secondary);
+}
+
+/* ========== Tab Views ========== */
+.tab-views {
+    min-height: 100%;
+    padding: var(--space-lg);
+}
+
+.tab-view {
+    display: none;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.tab-view.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Stacks */
+
+.stack-gap {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.stack-gap-sm {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.stack-gap-none {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Flex rows */
+.row-gap {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+}
+
+.row-between {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.row-right{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+}
+
+/* Grids */
+
+.main-layout {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.grid-main {
+    display: grid;
+    grid-template-columns: 2fr 1.2fr;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.grid-two {
+    display: grid;
+    grid-template-columns: 1.4fr 1.2fr;
+    gap: 14px;
+}
+
+.grid-50 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.grid-33 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+}
+
+.grid-25{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 14px;
+}
+
+.big-gap {
+    display: grid;
+    grid-template-columns: 1.2fr 1.1fr;
+    gap: 12px;
+}
+
+/* Responsive */
+
+@media (max-width: 1024px) {
+    .grid-main {
+        grid-template-columns: 1.4fr 1.1fr;
+    }
+
+    .grid-two {
+        grid-template-columns: 1fr;
+    }
+
+    .grid-50 {
+        grid-template-columns: 1fr;
+    }
+
+    .app-header {
+        flex-direction: column;
+        align-items: flex-start;
+        border-radius: 18px;
+    }
+
+    .header-right {
+        align-self: stretch;
+        justify-content: space-between;
+    } 
+}
+
+@media (max-width: 900px) {
+    .app-shell {
+        padding: 10px 10px 18px;
+    }
+
+    .nav-tabs {
+        border-radius: 18px;
+        padding: 3px;
+    }
+
+    .grid-main {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .nav-tabs {
+        flex-wrap: wrap;
+    }
+
+    .nav-btn {
+        flex: 1 1 calc(50% - 4px);
+        padding: 6px 8px;
+    }
+
+    .two-col,
+    .big-gap {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .small-field {
+        width: 100%;
+    }    
+}

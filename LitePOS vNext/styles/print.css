@@ -1,0 +1,317 @@
+/* Printable report */
+
+.card-printable-report {
+    position: relative;
+}
+
+.report-print-area {
+    border-radius: 14px;
+    border: 1px solid rgba(31, 41, 55, 1);
+    padding: 10px;
+    background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 1));
+    max-height: 260px;
+    overflow: auto;
+}
+
+.report-print-area h2 {
+    margin-top: 0;
+    font-size: 14px;
+}
+
+.report-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.report-print-table th,
+.report-print-table td {
+    border-bottom: 1px solid rgba(31, 41, 55, 1);
+    padding: 6px 8px;
+}
+
+
+/* Receipt */
+.receipt-print {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -9999;
+    color: #000;
+    background: #fff;
+}
+
+.receipt-inner {
+    font-size: 13px;
+    font-family: system-ui, sans-serif;
+    color: #000;
+    background: #fff;
+    padding: 20px;
+}
+
+.receipt-inner h2 {
+    margin: 0 0 4px;
+    text-align: center;
+}
+
+.receipt-header {
+    text-align: center;
+    color: #000;
+}
+
+.receipt-logo {
+    display: block;
+    margin: 0 auto 10px;
+    max-width: 120px;
+    max-height: 80px;
+}
+
+.receipt-logo-compact {
+    display: block;
+    margin: 0 auto 5px;
+    max-width: 80px;
+    max-height: 50px;
+}
+
+.receipt-table-compact th:nth-child(4),
+.receipt-table-compact td:nth-child(4) {
+    text-align: right;
+}
+
+.receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    color: #000;
+}
+
+.receipt-table th,
+.receipt-table td {
+    border-bottom: 1px solid #ccc;
+    padding: 4px;
+    color: #000;
+}
+
+.receipt-table th:nth-child(4),
+.receipt-table td:nth-child(4) {
+    text-align: right;
+}
+
+.receipt-totals {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    color: #000;
+}
+
+.receipt-totals div {
+    display: flex;
+    justify-content: space-between;
+    color: #000;
+    text-align: right;
+}
+
+.receipt-totals div:nth-last-child(3) {
+    font-weight: bold;
+    font-size: 1.1em;
+    border-top: 1px solid #000;
+    padding-top: 4px;
+}
+
+.receipt-note {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 12px;
+    font-style: italic;
+    color: #000;
+}
+
+/* Compact template styles */
+
+.receipt-header-compact {
+    text-align: center;
+    margin-bottom: 8px;
+    color: #000;
+}
+
+.receipt-table-compact {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    color: #000;
+    font-size: 10px;
+}
+
+.receipt-table-compact th,
+.receipt-table-compact td {
+    border-bottom: 1px solid #ccc;
+    padding: 3px 2px;
+    color: #000;
+}
+
+.receipt-totals-compact {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: #000;
+}
+
+.receipt-totals-compact div {
+    display: flex;
+    justify-content: space-between;
+    color: #000;
+    text-align: right;
+}
+
+.receipt-totals-compact div:nth-last-child(3) {
+    font-weight: bold;
+    border-top: 1px solid #000;
+    padding-top: 2px;
+}
+
+/* Print styles */
+
+@media print {
+    body {
+        background: #fff;
+    }
+
+    .app-shell,
+    .app-header,
+    #main-screen,
+    #login-screen {
+        box-shadow: none;
+        border-radius: 0;
+    }
+
+    /* Hide full UI by default */
+    .app-header,
+    .nav-tabs,
+    .tab-content,
+    #toast-container {
+        display: none !important;
+    }
+
+    /* Show only receipt or report area depending on print mode */
+    body.print-receipt .receipt-print {
+        display: block !important;
+        position: static !important;
+        z-index: 9999 !important;
+        color: #000 !important;
+        background: #fff !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+    
+    body.print-receipt .receipt-inner {
+        color: #000 !important;
+        background: #fff !important;
+    }
+    
+    body.print-receipt .receipt-inner * {
+        color: #000 !important;
+    }
+
+    body.print-report .report-print-area {
+        display: block !important;
+    }
+
+    body.print-report .report-print-area {
+        page-break-inside: avoid;
+    }
+
+    body.print-receipt .app-shell,
+    body.print-report .app-shell {
+        padding: 0;
+        margin: 0;
+        max-width: none;
+    }
+
+    .receipt-inner {
+        margin: 0 auto;
+    }
+
+    /* Dynamic receipt sizes via body class */
+    body.receipt-a4.print-receipt .receipt-inner {
+        width: 100%;
+        max-width: 210mm;
+    }
+
+    body.receipt-80mm.print-receipt .receipt-inner {
+        width: 80mm;
+        max-width: 80mm;
+        font-size: 12px;
+    }
+    
+    body.receipt-80mm.print-receipt .receipt-header h2 {
+        font-size: 18px;
+    }
+    
+    body.receipt-80mm.print-receipt .receipt-table {
+        font-size: 11px;
+    }
+
+    body.receipt-58mm.print-receipt .receipt-inner {
+        width: 58mm;
+        max-width: 58mm;
+        font-size: 10px;
+    }
+    
+    body.receipt-58mm.print-receipt .receipt-header h2,
+    body.receipt-58mm.print-receipt .receipt-header-compact h3 {
+        font-size: 14px;
+    }
+    
+    body.receipt-58mm.print-receipt .receipt-table,
+    body.receipt-58mm.print-receipt .receipt-table-compact {
+        font-size: 9px;
+    }
+}
+
+/* Page size rules - must be outside @media print for Chrome/Edge */
+@page {
+    size: A4 portrait;
+    margin: 10mm;
+}
+
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 10mm;
+    }
+}
+
+/* Override page size for thermal receipts */
+@media print {
+    body.receipt-80mm.print-receipt ~ * {
+        display: none;
+    }
+}
+
+@page :first {
+    size: A4 portrait;
+}
+
+/* Thermal receipt page sizes */
+body.receipt-80mm.print-receipt {
+    @supports (size: 80mm auto) {
+        @page {
+            size: 80mm auto;
+            margin: 5mm;
+        }
+    }
+}
+
+body.receipt-58mm.print-receipt {
+    @supports (size: 58mm auto) {
+        @page {
+            size: 58mm auto;
+            margin: 3mm;
+        }
+    }
+}
